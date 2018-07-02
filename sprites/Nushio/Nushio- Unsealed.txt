@@ -1,0 +1,4 @@
+Media in this folder is from "Unsealed: Whispers of Wisdom" by Nushio.
+Available at: https://opengameart.org/content/unsealed-whispers-of-wisdom-fixed
+and http://github.com/Nushio/Unsealed/
+See AUTHORS.txt in this folder for authors of media.

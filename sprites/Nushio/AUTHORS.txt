@@ -1,0 +1,245 @@
+Unsealed: Whispers of Wisdom
+
+This project could not have been done without the cooperation of the fine
+folk that participated in the Librated Pixel Cup. 
+http://lpc.opengameart.org
+
+Thank you, OpenGameArt, CreativeCommons, Free Software Foundation and Mozilla.
+
+Code authors
+============
+
+This program was written by Juan 'Nushio' Rodriguez, with contributions from:
+
+-drawig
+-davexunit ( http://davexunit.wordpress.com/ )
+-Gustavo Steigert ( http://steigert.blogspot.ca/ )
+
+Asset attribution
+=================
+
+Assets were authored by the following people:
+
+Resources, Licensed CC-By-SA 3.0 and GPLv3 (unless otherwise noted):
+
+
+
+----
+
+Laura 'Yamilian' Katz
+raw-resources/images/splash-screen/menulogo.png
+
+raw-resources/images/char-sprites/lidia_spritesheet.png
+
+raw-resources/images/char-sprites/shura_spritesheet.png
+raw-resources/images/char-sprites/penguins.png
+
+raw-resources/images/char-sprites/whisperer_spritesheet.png
+----
+
+Nikko 'lastplacer' Campbell
+
+Every tmx inside raw-resources/maps/
+Including the "dojo to render' inside raw-resources/images/maps/
+raw-resources/maps/tiles_/Dungeons.png
+Based on the Base Assets for the LPC
+http://lpc.opengameart.org/static/lpc-style-guide/assets.html#outdoors
+
+raw-resources/maps/tiles_/exteriors.png
+Based on the Base Assets for the LPC
+http://lpc.opengameart.org/static/lpc-style-guide/assets.html#outdoors
+Contains Daniel 'Daneeklu' Eddeland's Farming Tilesets
+http://opengameart.org/content/lpc-farming-tilesets-magic-animations-and-ui-elements
+Contains caeles' Signpost tiles
+http://opengameart.org/content/lpc-caeles-art
+Contains Guido Bos' Flowers tileset
+http://opengameart.org/content/lpc-guido-bos-entries-cut-up
+Contains Casper Nilsson's Asian Theme Tileset
+Contains Juan 'Nushio' Rodriguez & Cem Kalyoncu's Colorful Sand + Deep Water
+http://opengameart.org/content/lpc-colorful-sand
+
+raw-resources/maps/tiles_/Interiors.png
+Based on the Base Assets for the LPC
+http://lpc.opengameart.org/static/lpc-style-guide/assets.html#building-indoors
+
+raw-resources/images/battle/maps/battlemap0.png
+raw-resources/images/battle/maps/battlemap1.png
+raw-resources/images/battle/maps/battlemap2.png
+raw-resources/images/battle/maps/battlemap3.png
+raw-resources/images/battle/maps/battlemap4.png
+raw-resources/images/battle/maps/battlemap5.png
+raw-resources/images/battle/maps/battlemap6.png
+raw-resources/images/battle/maps/battlemap-test.png
+
+
+----
+
+Ben 'Cookiez' Potter
+
+raw-resources/images/battle/entities/bee.png
+raw-resources/images/battle/entities/fireball.png
+raw-resources/images/battle/clam.png
+raw-resources/images/battle/ghost.png
+raw-resources/images/battle/lidia.png
+
+raw-resources/xcfs/clam.xcf
+raw-resources/xcfs/ghost.xcf
+
+raw-resources/images/battle/entities/snake.png
+raw-resources/images/char-sprites/pixie_spritesheet.png
+
+enemies such as Xios and Gnu inside battle
+xios-overworld.png
+gnu.png
+
+Xios' attack animations, the treeroot and treetrunk
+---
+
+Fiona 'Wyverii' Wilson
+
+raw-resources/images/battle/entities/terrex.png
+raw-resources/images/battle/entities/sand-snake.png
+raw-resources/images/battle/entities/snake-1.png
+
+---
+
+Juan 'Nushio' Rodriguez
+raw-resources/images/battle/field-3x3.png
+raw-resources/images/battle/field-3x4.png
+raw-resources/images/battle/field-4x3.png
+raw-resources/images/battle/field-4x4.png
+Based on the Liberated Pixel Cup 'dirt' tileset.
+http://lpc.opengameart.org/static/lpc-style-guide/assets.html
+
+raw-resources/images/battle/lifebar.png
+raw-resources/images/battle/enemy-lifebar.png
+raw-resources/xcfs/lifebar.xcf
+raw-resources/xcfs/lifebar-xl.xcf
+dialog-box.9.png
+Based on Pennomi's UI Elements
+http://opengameart.org/content/lpc-pennomis-ui-elements
+
+raw-resources/images/char-sprites/female_spritesheet.png
+Based on Pennomi & Laetissima's Irish Dancing Dress Female Spritesheet
+
+raw-resources/images/char-sprites/male_spritesheet.png
+Based on Johannes Sjölund's Character animations & weapons
+
+raw-resources/maps/tiles_/collisionator.png
+Licensed: CC0. (Free to use as needed / Public Domain)
+
+raw-resources/images/battle/triggers.png
+raw-resources/xcfs/triggers.xcf
+raw-resources/images/battle/ui/dpad_alt.png
+raw-resources/images/battle/ui/dpad_down.png
+raw-resources/images/battle/ui/dpad_left.png
+raw-resources/images/battle/ui/dpad_right.png
+raw-resources/images/battle/ui/dpad_up.png
+raw-resources/images/battle/ui/dpad.png
+raw-resources/images/battle/ui/lefttrigger.png
+raw-resources/images/battle/ui/mana_sphere.png
+
+
+-----
+Daniel 'Daneeklu' Eddleland
+
+raw-resources/images/battle/entities/firelion_left.png
+raw-resources/images/battle/entities/firelion.png
+raw-resources/images/battle/entities/icetacle.png
+raw-resources/images/battle/entities/lightningclaw.png
+raw-resources/images/battle/entities/shield.png
+raw-resources/images/battle/entities/snakebite_side.png
+raw-resources/images/battle/entities/spikes.png
+raw-resources/images/battle/entities/tornado.png
+raw-resources/images/battle/entities/torrentacle.png
+
+raw-resources/images/battle/ui/spells.png
+Made by Daneeklu then ruined by Nushio. 
+Contains Firepunch icon by Jorge Avila
+http://opengameart.org/content/fire-punch
+
+---
+Kids by
+Artist: 'sheep'
+
+http://opengameart.org/content/alternate-lpc-character-sprites-george
+
+Radomir Dopieralksi
+http://opengameart.org/content/one-more-lpc-alternate-character
+
+
+---
+
+Citizen 0 & Combat Dummy By johannes  'wulax' Sjolund 
+http://opengameart.org/content/lpc-medieval-fantasy-character-sprites
+
+Citizen 10 by Luke_Mehl
+---
+
+KPKarl
+raw-resources/images/splash-screen/splash.png
+Contains Yamilian's Unsealed logo. 
+---
+'artistic dude'
+Fire sound effect
+http://opengameart.org/content/fire-evil-spell
+
+Enchant sound effect by p0ss
+http://opengameart.org/content/spell-sounds-starter-pack
+
+---
+
+Unknown Horizons
+Chriss Oelmueller
+Stubb
+
+raw-resources/svgs/unknown_horizons_gui.svg
+raw-resources/svgs/unknown_horizons_gui_2.svg
+http://opengameart.org/content/real-time-strategy-gui-hud-elements-unknown-horizons
+
+raw-resources/images/battle/ui/blue_facebutton1.png
+raw-resources/images/battle/ui/blue_facebutton2.png
+Derived from the above svgs. 
+----
+
+LibGDX / Bad Logic Games
+raw-resources/xcfs/uiskin.xcf
+http://code.google.com/p/libgdx/source/browse/#svn%2Ftrunk%2Fextensions%2Fgdx-tools%2Fassets%2Fui
+
+----
+
+Music
+
+music/02 - The Empire.ogg
+music/04 - Theme of Love_0.ogg
+music/05 - Opening Theme.ogg
+music/07 - Overworld.ogg
+music/09 - Victory.ogg
+music/14 - Tragedy.ogg
+music/20 - Eastern City.ogg
+music/24 - Undying Dream_0.ogg
+music/25 - Sanctuary_1.ogg
+music/32 - Water Temple_2.ogg
+The bundle above was composed by avgvst and is licensed CC-By 3.0
+http://opengameart.org/content/generic-8-bit-jrpg-soundtrack
+
+music/alienblues.ogg
+Composed by Clemens H, Licensed CC0
+http://opengameart.org/content/alien-blues-8-bit-melody
+
+music/hold the line_1.ogg
+Compsed by Bart, from OpenGameArt.org. Licensed CC-By-SA 3
+http://opengameart.org/content/hold-line-lospec-mix
+
+music/The Adventure Begins 8-bit remix.ogg
+Composed by Bart, from OpenGameArt.org. Licensed CC-By-SA 3
+http://opengameart.org/content/the-adventure-begins-8-bix-remix
+
+music/free-software-song-julian-coccia.ogg
+Downloaded from http://www.gnu.org/music/free-software-song.html
+Recorded by Julian Coccia and released under GFDLv1.3+.
+
+music/victory-theme.ogg
+Recorded by Saul Rodriguez & Julio Nacianceno 'Agnus Dei'
+The Audio was remixed by Juan 'Nushio' Rodriguez  with their permission 
+and is licensed CC-By-SA 3.0

@@ -2,7 +2,7 @@
 Minimal Game Engine for Pygame - More Assumptions, Less Typing
 
 ## Planned Features
-~=low-priority
+~: low-priority
 * Examples
 * Flipping direction of graphics
 * (~) Recoloring
