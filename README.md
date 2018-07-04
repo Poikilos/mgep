@@ -8,7 +8,10 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
 * Transient effects (remove on animation end)
 * Auto-generate credits
 * Calculate hitboxes
-* for Underworld Load 32px tileset: animated lava, animated floor spikes, water?
+* frame commands
+  * play sound
+  * cause damage
+  * move by vector
 * (~) color key
 * (~) Recoloring
 * (~) Sprite overlays (clothes, weapons, 2-square sprites)
