@@ -1,0 +1,8 @@
+underworld_load-32x32
+walls, open doors, 4 swirl floor, creatures
+by Redshrike
+all others by poikilos
+opengameart.org/content
+/a-load-of-overworld-34-rpg-sprites
+CC BY 3.0 Redshrike (layout by poikilos)
+ 

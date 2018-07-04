@@ -5,10 +5,27 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
 ~: low-priority
 * Examples
 * Flipping direction of graphics
+* Transient effects (remove on animation end)
+* Auto-generate credits
+* Calculate hitboxes
+* for Underworld Load 32px tileset: animated lava, animated floor spikes, water?
+* (~) color key
 * (~) Recoloring
+* (~) Sprite overlays (clothes, weapons, 2-square sprites)
+* (~) Re-edging
 
 ## Directives
-mgep is intended for novices, learners, and anyone who wants to focus on the game creation process and is not interested in advanced principles of Pygame or Python. mgep allows you to create a game with the fewest lines possible by making helpful assumptions. For example, if you specify only the minimum parameters, you get a top view game.
+mgep is intended for novices, elementary learners, and anyone who wants
+to focus on the game creation process after writing few lines of code.
+mgep allows you to create a game with the fewest lines possible by
+making helpful assumptions.
+
+## Usage
+
+## Helpful Assumptions
+* loading a tileset makes a top view game
+* adding sprites by row, col uses last loaded tileset
+* first sprite added via add_sprite is the player
 
 ## License
 License for media is CC0 unless otherwise specified in folders (you must credit authors where there is an "Attribution" or "credits" file that specifies and attribution license such as CC BY)
