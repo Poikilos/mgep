@@ -1,6 +1,13 @@
 # mgep
 Minimal Game Engine for Pygame - More Assumptions, Less Typing
 
+## Known Issues
+* allow custom delay_count
+* is iterator logic from pygame wiki's spritesheets wrong (the index
+  is always 1 ahead of the frame)?
+* keep track of facing direction and look for 'idle.left' etc and only
+  use 'idle' if no matching directional idle sprite key is found
+
 ## Planned Features
 ~: low-priority
 * Examples
@@ -24,12 +31,17 @@ mgep allows you to create a game with the fewest lines possible by
 making helpful assumptions.
 
 ## Usage
+* place the mgep folder in the directory of your project
+* `from mgep import *`
 
 ## Helpful Assumptions
 * loading a tileset makes a top view game
 * adding sprites by row, col uses last loaded tileset
-* first sprite added via add_sprite is the player
 * walk speed based on real life: 2 meters per second, in 3 steps (such as left, right, left)
+  --so delay_count is 20, so that sprite animations will always be 3 FPS (which is good for for sprite sheets with 3-frame [left, middle, right] animations, such as so-called "3x4" sprite sheets with `order=[1,2,1,3]`)
+* if you do move_y by positive number, and have loaded a pose called 'walk.down', then the sprite's pose will be set to 'walk.down' 
+* if you add a material more than once it will be more common
+* if you run `stop_sprite`, idle animation will be used, and if 'idle' key is not in `materials[sprite[what]]['tmp']['sprites']` dictionary, then `sprite['animate']` will be set to `False`.
 
 ## License
 * License for media is CC0 unless otherwise specified in folders (you
