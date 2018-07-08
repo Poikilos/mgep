@@ -1,8 +1,27 @@
 #!/usr/bin/env python
 import os, sys
 import pygame as pg
-from mgep import *
 
+
+# This basename nonsense is only needed because this py file is in
+# the mgep directory. Place mgep directory inside your project's
+# directory to avoid this issue.
+if os.path.basename(os.path.dirname(os.path.abspath(__file__))) == "mgep":
+    print("in:"+os.getcwd())
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    print("in:"+os.getcwd())
+    #print("script in: "+os.path.basename(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from mgep import *
+except:
+    print("missing mgep.")
+    print("try the following in git shell from your project directory:")
+    print("git clone https://github.com/poikilos/mgep")
+    #print("sys.path: "+str(sys.path))
+    #print("in: "+os.getcwd())
+    
 pg.init()
 screen = pg.display.set_mode((400, 300))
 set_scale(2)
