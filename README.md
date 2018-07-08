@@ -5,8 +5,7 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
 * allow custom delay_count
 * is iterator logic from pygame wiki's spritesheets wrong (the index
   is always 1 ahead of the frame)?
-* keep track of facing direction and look for 'idle.left' etc and only
-  use 'idle' if no matching directional idle sprite key is found
+* move frame order logic from SpriteStripAnim to material
 
 ## Planned Features
 ~: low-priority
@@ -15,14 +14,16 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
 * Transient effects (remove on animation end)
 * Auto-generate credits
 * Calculate hitboxes
-* frame commands
+* commands on specific frame of sprite
   * play sound
   * cause damage
   * move by vector
 * (~) color key
 * (~) Recoloring
-* (~) Sprite overlays (clothes, weapons, 2-square sprites)
+* (~) Sprite constructs with offsets (clothes, weapons, 2-square sprites)
 * (~) Re-edging
+
+## Changes
 
 ## Directives
 mgep is intended for novices, elementary learners, and anyone who wants
@@ -33,6 +34,7 @@ making helpful assumptions.
 ## Usage
 * place the mgep folder in the directory of your project
 * `from mgep import *`
+* for more information, see example*.py
 
 ## Helpful Assumptions
 * loading a tileset makes a top view game
@@ -41,7 +43,9 @@ making helpful assumptions.
   --so delay_count is 20, so that sprite animations will always be 3 FPS (which is good for for sprite sheets with 3-frame [left, middle, right] animations, such as so-called "3x4" sprite sheets with `order=[1,2,1,3]`)
 * if you do move_y by positive number, and have loaded a pose called 'walk.down', then the sprite's pose will be set to 'walk.down' 
 * if you add a material more than once it will be more common
-* if you run `stop_sprite`, idle animation will be used, and if 'idle' key is not in `materials[sprite[what]]['tmp']['sprites']` dictionary, then `sprite['animate']` will be set to `False`.
+* if you run `stop_unit`, idle animation will be used, and if 'idle' key is not in `materials[sprite[what]]['tmp']['sprites']` dictionary, then `sprite['animate']` will be set to `False`.
+  * keeps track of facing direction (if move_x and move_y are used) and look for 'idle.left' etc and only
+    use 'idle' if no matching directional idle sprite key is found
 
 ## License
 * License for media is CC0 unless otherwise specified in folders (you
