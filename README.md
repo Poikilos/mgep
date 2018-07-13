@@ -18,6 +18,7 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
   * play sound
   * cause damage
   * move by vector
+* stretch entire screen onto a `pg.Surface((w, h), pygame.SRCALPHA)`
 * (~) color key
 * (~) Recoloring
 * (~) Sprite constructs with offsets (clothes, weapons, 2-square sprites)

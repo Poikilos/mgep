@@ -654,3 +654,9 @@ def load_world(name, generate=False):
                 #else:
                     #print("generated None at " + sk)
     _place_world()
+
+
+if __name__ == "__main__":
+    print("Instead of running this file, use it in your program like:\n"
+          "from mgep import *\n"
+          "#see also example-*.pyw")
