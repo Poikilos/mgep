@@ -446,6 +446,11 @@
    <object id="1" x="10" y="0" width="12.0909" height="32.0909"/>
   </objectgroup>
  </tile>
+ <tile id="214">
+  <objectgroup draworder="index">
+   <object id="1" x="0.0909091" y="0.272727" width="31.8182" height="31.5455"/>
+  </objectgroup>
+ </tile>
  <tile id="220">
   <objectgroup draworder="index">
    <object id="1" x="0" y="0" width="25.3333" height="32.3333"/>
