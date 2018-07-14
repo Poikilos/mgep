@@ -21,6 +21,7 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
 * stretch entire screen onto a `pg.Surface((w, h), pygame.SRCALPHA)`
 * (~) color key
 * (~) Recoloring
+  * colorize specific parts: select set of colors, or select only >0% saturation area area or only 0% saturation area
 * (~) Sprite constructs with offsets (clothes, weapons, 2-square sprites)
 * (~) Re-edging
 
