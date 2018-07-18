@@ -7,17 +7,33 @@ except:
     exit(1)
 
 import random
+import math
 # the world is a dict of lists (multiple gobs can be on one location)
-
+block_thickness_as_y = 1
 tilesets = {}
 file_surfaces = {}
 materials = {}
 material_choose = [None]
 world = {}
+world["blocks"] = {}
 #screen = None
 player_unit_name = None
 world_tile_size = None
 units = {}
+default_font = None
+popup_text = ""
+popup_showing_text = None
+popup_surf = None
+popup_shadow_surf = None
+popup_sec = 0
+popup_alpha = 0
+visual_debug_enable = False
+settings = {}
+settings["popup_sec_per_character"] = .04
+settings["popup_alpha_per_sec"] = 128.0
+settings['text_antialiasing'] = True
+temp_screen = None
+text_pos = [0, 0]
 
 last_loaded_path = None
 # material spec:
@@ -53,10 +69,31 @@ last_loaded_path = None
 
 camera = {}
 camera['pos'] = (0, 0)
-scale = 1
+scale = None
+desired_scale = None
+def toggle_visual_debug():
+    global visual_debug_enable
+    if visual_debug_enable:
+        set_visual_debug(False)
+    else:
+        set_visual_debug(True)
+
+def set_visual_debug(boolean):
+    global visual_debug_enable
+    visual_debug_enable = boolean
+    print("visual_debug_enable: " + str(visual_debug_enable))
+
+def show_popup(s):
+    global popup_text
+    popup_text = s
+    global popup_alpha
+    popup_alpha = 255
 
 def set_scale(whole_number):
-    scale = whole_number
+    global scale
+    global desired_scale
+    scale = int(round(whole_number))
+    desired_scale = scale
 
 def get_key_at_pos(pos):
     w, h = world_tile_size  # tilesets[path]['tile_size']
@@ -287,76 +324,247 @@ class SpriteStripAnim(object):
 #    global screen
 #    screen = s
 
+#def init():
+#    global settings
+#    if settings is None:
+
+prev_frame_ticks = None
+min_fps_ticks = 1000
+total_ticks = 0
+frame_count = 0
+fps_s = "?"
+scalable_surf = None
+scalable_surf_scale = None
+
+#region reinitialized each frame
+win_size = None
+scaled_size = None
+scaled_block_size = None
+block_half_counts = None
+start_loc = None
+end_loc = None
+#endregion reinitialized each frame
 
 def draw_frame(screen):
-    #pg.draw.rect(screen, color, pg.Rect(x, y, 64, 64))
-    
-    for k, v in world.items():
-        cs = k.split(",")
-        sk = k  # spatial key
-        col, row = (int(cs[0]), int(cs[1]))
+    global settings
+    global temp_screen
+    global text_pos
+    global win_size
+    global scaled_size
+    global scaled_block_size
+    global block_half_counts
+    global start_loc
+    global end_loc
+    global block_thickness_as_y
+    global scale
+    global desired_scale
+    global scalable_surf
+    global scalable_surf_scale
+    text_pos = [4,4]
+    # pg.draw.rect(screen, color, pg.Rect(x, y, 64, 64))
+    new_win_size = screen.get_size()
+    if win_size is None or win_size[0] != new_win_size[0] or win_size[1] != new_win_size[1]:
         win_size = screen.get_size()
-        screen_half = win_size[0] / 2, win_size[1] / 2
-        w, h = world_tile_size
-        offset = 0
-        for i in range(len(v)):
-            node = v[i]
-            name = k + "[" + str(i) + "]"  # such as '0,0[1]'
-            pos = (col*w, row*h)
-            pose = None
-            pose = node.get('pose')
-            if pose is None:
-                #print("WARNING: no pose for " + node['what'] + " at " + k)
-                pose = materials[node['what']].get('default_pose')
-                if pose is None:
-                    print("WARNING: no default_pose for " + node['what'])
-                    pose = random.choice(list(material['tmp']['sprites']))
-            anim = materials[node['what']]['tmp']['sprites'][pose]
-            src_size = anim.get_surface().get_size()
-            x = pos[0]-camera['pos'][0] + screen_half[0] - src_size[0]/2
-            #if x+w < 0 or x >= win_size[0]:
-            #    continue
-            y = -1*(pos[1]-camera['pos'][1]) + screen_half[1] - src_size[1]/2
-            #if y+w < 0 or y >= win_size[0]:
-            #    continue
-            #if k=="me":
-                #print("me at " + str((x,y)))
-            screen.blit(anim.get_surface(), (x,y-offset))
-            animate = node.get('animate')
-            if animate is True:
-                anim.advance()
-            offset += 1
+        scale = None
+        scalable_surf = None
+        #print("Changed window size...")
+        #print("win_size: " + str(win_size))
+        #print("scale: " + str(scale))
+    # an ideal scale will have about 12 meters for smallest dimension
+    short_px_count = win_size[1]
+    if win_size[0] < win_size[1]:
+        short_px_count = win_size[0]
+    ideal_tile_h = short_px_count / 12
+    if scale is None:
+        if desired_scale is None:
+            scale = int(round(ideal_tile_h/world_tile_size[1]))
+            print("scale automatically chosen: " + str(scale))
+        else:
+            scale = desired_scale
+    scaled_size = win_size[0] / scale, win_size[1] / scale
+    if scalable_surf is None or scale != scalable_surf_scale:
+        scalable_surf = pg.Surface((int(scaled_size[0]), int(scaled_size[1]))).convert()  # , flags=pg.SRCALPHA)
+        scalable_surf_scale = scale
+        temp_screen = scalable_surf
+
+    camera_loc = get_loc_at_px(camera['pos'])
+    scaled_block_size = world_tile_size[0] * scale, world_tile_size[1] * scale
+    block_counts = math.ceil(scaled_size[0] / world_tile_size[0]), math.ceil(scaled_size[1] / world_tile_size[1])
+    block_half_counts = int(block_counts[0] / 2) + 1, int(block_counts[1] / 2) + 1
+    # reverse the y order so larger depth value is drawn below other layers
+    # (end_loc's y is NEGATIVE on purpose due to draw order)
+    max_stack_preload_count = 5
+    extra_count = max_stack_preload_count * block_thickness_as_y
+    start_loc = camera_loc[0] - block_half_counts[0], camera_loc[1] + block_half_counts[1]
+    end_loc = (camera_loc[0] + block_half_counts[0],
+               camera_loc[1] - block_half_counts[1] - extra_count)
+    screen_half = scaled_size[0] / 2, scaled_size[1] / 2
+    w, h = world_tile_size
+    blocks = world["blocks"]
+    # for k, v in blocks.items():
+    block_y = start_loc[1]
+    while block_y >= end_loc[1]:
+        block_x = start_loc[0]
+        while block_x <= end_loc[0]:
+            k = str(block_x) + "," + str(block_y)
+            v = blocks.get(k)
+            if v is not None:
+                cs = k.split(",")
+                sk = k  # spatial key
+                col, row = (int(cs[0]), int(cs[1]))
+                offset = 0
+                for i in range(len(v)):
+                    node = v[i]
+                    name = k + "[" + str(i) + "]"  # such as '0,0[1]'
+                    pos = (col*w, row*h)
+                    pose = None
+                    pose = node.get('pose')
+                    if pose is None:
+                        # print("WARNING: no pose for " + node['what'] + " at " + k)
+                        pose = materials[node['what']].get('default_pose')
+                        if pose is None:
+                            print("WARNING: no default_pose for " + node['what'])
+                            pose = random.choice(list(material['tmp']['sprites']))
+                    anim = materials[node['what']]['tmp']['sprites'][pose]
+                    src_size = anim.get_surface().get_size()
+                    x = pos[0]-camera['pos'][0] + screen_half[0] - src_size[0]/2
+                    # if x+w < 0 or x >= win_size[0]:
+                    #     continue
+                    y = -1*(pos[1]-camera['pos'][1]) + screen_half[1] - src_size[1]/2
+                    # if y+w < 0 or y >= win_size[0]:
+                    #     continue
+                    # if k=="me":
+                    #     print("me at " + str((x,y)))
+                    scalable_surf.blit(anim.get_surface(), (x,y-offset))
+                    animate = node.get('animate')
+                    if animate is True:
+                        anim.advance()
+                    offset += block_thickness_as_y
+            block_x += 1
+        block_y -= 1
     for k, v in units.items():  # TODO: check for python2 units.iteritems()
-        
         material = materials[v['what']]
         anim = material['tmp']['sprites'][v['pose']]
         if v['animate']:
             anim.advance()
-            #if v['pose'] != 0: print("iter " + v['pose'])
-        #else:
-            #if v['pose'] != 0: print("hold " + v['pose'])
-        win_size = screen.get_size()
-        screen_half = win_size[0] / 2, win_size[1] / 2
+            # if v['pose'] != 0: print("iter " + v['pose'])
+        # else:
+            # if v['pose'] != 0: print("hold " + v['pose'])
+        screen_half = scaled_size[0] / 2, scaled_size[1] / 2
         w, h = world_tile_size
-        #center_tile_tl_pos = win_size[0]/2-world_tile_size[0]/2, win_size[1]/2-world_tile_size[1]/2
-        #center_tile_tl_pos = (0,0)
+        # center_tile_tl_pos = win_size[0]/2-world_tile_size[0]/2,
+        #                      win_size[1]/2-world_tile_size[1]/2
+        # center_tile_tl_pos = (0,0)
         pos = v['pos']
         sk = get_key_at_pos(pos)
         offset = -1
-        stack = world.get(sk)
+        stack = blocks.get(sk)
         if stack is not None:
             offset = len(stack)
         src_size = anim.get_surface().get_size()
-        x = pos[0]-camera['pos'][0] + screen_half[0] - src_size[0]/2
-        #if x+w < 0 or x >= win_size[0]:
-        #    continue
-        y = -1*(pos[1]-camera['pos'][1]) + screen_half[1] - src_size[1]/2
-        #if y+w < 0 or y >= win_size[0]:
-        #    continue
-        #if k=="me":
-            #print("me at " + str((x,y)))
-        screen.blit(anim.get_surface(), (x,y-offset))
+        x = (pos[0] - camera['pos'][0]) + screen_half[0] - src_size[0]/2
+        # if x+w < 0 or x >= win_size[0]:
+        #     continue
+        y = -1*(pos[1] - camera['pos'][1]) + screen_half[1] - src_size[1]/2
+        # if y+w < 0 or y >= win_size[0]:
+        #     continue
+        # if k=="me":
+        #     print("me at " + str((x,y)))
+        scalable_surf.blit(anim.get_surface(), (x,y-offset))
         # surface = next(anim)
+    global default_font
+
+    global popup_showing_text
+    if default_font is None:
+        default_font = pg.font.SysFont('Arial', 12)
+    global popup_surf
+    global popup_shadow_surf
+    global popup_text
+    global popup_alpha
+    global popup_sec
+
+    global prev_frame_ticks
+    global total_ticks
+    global frame_count
+    global visual_debug_enable
+    passed = 0.0  # seconds
+    passed_ms = 0
+    this_frame_ticks = pg.time.get_ticks() 
+    fps = 0.0  # clock.get_fps()
+    global fps_s
+    if prev_frame_ticks is not None:
+        passed_ms = this_frame_ticks - prev_frame_ticks
+        prev_frame_ticks = this_frame_ticks
+        passed = float(passed_ms) / 1000.0
+        total_ticks += passed_ms
+        frame_count += 1
+        if total_ticks >= min_fps_ticks:
+            #avg = float(total_ticks) / float(min_fps_ticks)
+            fps = frame_count / (float(total_ticks)/1000.0)
+            fps_s = "{0:.1f}".format(round(fps,1))
+        #if passed > 0.0:
+            #fps = 1000/passed
+            #fps_s = str(fps)
+            # fps_s = str(clock.get_fps())  # clock is only in game
+    else:
+        prev_frame_ticks = this_frame_ticks
+
+    if visual_debug_enable:
+        push_text(fps_s)
+
+    if (popup_surf is None) or (popup_showing_text != popup_text):
+        if popup_text is not None:
+            popup_surf = default_font.render(popup_text, settings['text_antialiasing'], (255, 255, 255))
+            popup_shadow_surf = default_font.render(popup_text, False, (0, 0, 0))
+            popup_sec = settings["popup_sec_per_character"] * len(popup_text)
+            popup_alpha = 255
+            settings["popup_sec_per_character"] = .04
+        else:
+            popup_surf = default_font.render("", settings['text_antialiasing'], (255, 255, 255))
+            popup_shadow_surf = default_font.render("", settings['text_antialiasing'], (0, 0, 0))
+        popup_showing_text = popup_text
+
+    if popup_surf is not None:
+        if popup_sec > 0:
+            popup_sec -= passed
+        if popup_alpha > 0:
+            if popup_sec <= 0:
+                popup_shadow_surf.set_alpha(popup_alpha)
+                popup_surf.set_alpha(popup_alpha)
+            scalable_surf.blit(popup_shadow_surf,(text_pos[0]+2,text_pos[1]+1))
+            scalable_surf.blit(popup_surf,(text_pos[0],text_pos[1]))
+            text_size = popup_surf.get_size()
+            text_pos[1] += text_size[1]
+            popup_alpha -= settings["popup_alpha_per_sec"] * passed
+    screen.blit(pg.transform.scale(scalable_surf, (int(win_size[0]),int(win_size[1]))),(0,0))
+    show_stats_once()
+
+show_stats_enable = True
+def show_stats_once():
+    global show_stats_enable
+    if show_stats_enable:
+        print()
+        print("win_size: " + str(win_size))
+        print("scaled_size: " + str(scaled_size))
+        print("scaled_block_size: " + str(scaled_block_size))
+        print("block_half_counts: " + str(block_half_counts))
+        print("start_loc: " + str(start_loc))
+        print("end_loc: " + str(end_loc))
+        print("scale: " + str(scale))
+    show_stats_enable = False
+
+
+def push_text(s, color=(255,255,255), screen=None):
+    global text_pos
+    global temp_screen
+    global settings
+    if screen is not None:
+        temp_screen = screen
+    if temp_screen is not None:
+        s_surf = default_font.render(s, settings['text_antialiasing'], color)
+        text_size = s_surf.get_size()
+        temp_screen.blit(s_surf, (text_pos[0],text_pos[1]))
+        text_pos[1] += text_size[1]
 
 # series: if more than one frame, you can pass pre-generated sprite loop 
 # order: (requires len(series)>1) indices of frames specifying order
@@ -394,7 +602,7 @@ def _load_sprite(what, cells, order=None, gettable=True,
         material["serials"][pose] = cells
     else:
         material["serials"][pose].extend(cells)
-    
+
     #prev_sprite = material['tmp']['sprites'].get(pose)
     w, h = tilesets[path]['tile_size']
     if series is None:
@@ -404,10 +612,10 @@ def _load_sprite(what, cells, order=None, gettable=True,
                 series = SpriteStripAnim(path, rect, 1, loop=loop, delay_count=20)
             else:
                 series += SpriteStripAnim(path, rect, 1, loop=loop, delay_count=20)
-    
+
     if material['tmp'].get('sprites') is None:
         material['tmp']['sprites'] = {}
-    
+
     if material['tmp']['sprites'].get(pose) is None:
         material['tmp']['sprites'][pose] = series
     else:
@@ -572,6 +780,10 @@ def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
 #    if os.path.isfile("world.json"):
 #        pass
 
+def get_loc_at_px(pos):
+    world_loc = int(pos[0] / world_tile_size[0]), int(pos[1] / world_tile_size[1])
+    return world_loc
+
 def get_gobs_at(loc):
     result = None
     # sk for spatial key
@@ -583,7 +795,8 @@ def _place_world():
     if last_loaded_path is None:
         raise ValueError("missing last_loaded_path (must load_tileset"
                          "before load_world can call graphics methods)")
-    #for k, v in world.items():
+    #blocks = world["blocks"]
+    #for k, v in blocks.items():
     #    cs = k.split(",")  # key is a location string
     #    col, row = (int(cs[0]), int(cs[1]))
     #    w, h = world_tile_size  # tilesets[path]['tile_size']
@@ -605,10 +818,11 @@ def get_whats(nodes):
 def pop_node(key):
     sk = key  # spatial key
     result = None
-    if sk in world:
-        if len(world[sk]) > 1:
-            result = world[sk][-1]
-            del world[sk][-1]
+    blocks = world["blocks"]
+    if sk in blocks:
+        if len(blocks[sk]) > 1:
+            result = blocks[sk][-1]
+            del blocks[sk][-1]
             #result = units[sk]
             #units.remove(sk)
     else:
@@ -620,6 +834,8 @@ def pop_node(key):
 def load_world(name, generate=False):
     global world
     world = {}
+    world["blocks"] = {}
+    blocks = world["blocks"]
     #TODO: if generate:
     bedrock_what = None
     material_all = list(materials)
@@ -630,12 +846,12 @@ def load_world(name, generate=False):
     for col in range(-30, 30):
         for row in reversed(range(-30, 30)):
             sk = str(col)+","+str(row)
-            world[sk] = []
+            blocks[sk] = []
             if len(materials) > 0:
                 if bedrock_what is not None:
                     bedrock = {}  # recreate each time so not instance
                     bedrock['what'] = bedrock_what
-                    if bedrock is not None: world[sk].append(bedrock)
+                    if bedrock is not None: blocks[sk].append(bedrock)
                     else:
                         print("WARNING: no 'bedrock' material")
                 node = {}
@@ -650,11 +866,10 @@ def load_world(name, generate=False):
                     # converting a dict to a list yields the keys:
                     node['pose'] = random.choice(list(material['tmp']['sprites']))
                     #print("generated " + node['what'] + " pose " + node['pose'] + " at " + sk)
-                    world[sk].append(node)
+                    blocks[sk].append(node)
                 #else:
                     #print("generated None at " + sk)
     _place_world()
-
 
 if __name__ == "__main__":
     print("Instead of running this file, use it in your program like:\n"
