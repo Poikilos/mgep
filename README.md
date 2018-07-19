@@ -69,3 +69,14 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
 * loc or location (col,row format NOT row,col ) is always a cell location in the world database
 * pos is a pixel location in the world (NOT on the screen generally)
 * what SpriteSheet calls ticks is actually a frame count which multiplies each frame's duration
+* removed junk from repo with following command:
+  `git filter-branch --index-filter 'git rm --cached --ignore-unmatch sprites/blender-volumetric-particles-effects.zip'`
+  * find name of object via (where b5c95b17a0eff5bf7025ab4c589df39c50ad95, a SHA1, is name of file in .git/objects):
+    `git rev-list --objects --all | grep b5c95b17a0eff5bf7025ab4c589df39c50ad95`
+  * file is still there for unknown reason (output of line above is "sprites/blender-volumetric-particles-effects.zip")
+  * so instead used:
+```
+    sudo wget https://raw.githubusercontent.com/nachoparker/git-forget-blob/master/git-forget-blob.sh -O /usr/local/bin/git-forget-blob
+    sudo chmod +x /usr/local/bin/git-forget-blob
+    git-forget-blob sprites/blender-volumetric-particles-effects.zip
+```
