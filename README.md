@@ -76,7 +76,13 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
   * file is still there for unknown reason (output of line above is "sprites/blender-volumetric-particles-effects.zip")
   * so instead used:
 ```
+    #I'm not sure if the commented lines below are needed or not, because I ran them but they had errors:
     sudo wget https://raw.githubusercontent.com/nachoparker/git-forget-blob/master/git-forget-blob.sh -O /usr/local/bin/git-forget-blob
     sudo chmod +x /usr/local/bin/git-forget-blob
     git-forget-blob sprites/blender-volumetric-particles-effects.zip
+    #git remote add origin https://github.com/poikilos/mgep
+    #git push -u origin master
+    #git push -u origin --all
+    #git push --set-upstream origin master
+    git push -f origin master
 ```
