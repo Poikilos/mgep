@@ -814,6 +814,9 @@ def get_whats(nodes):
         what = node.get('what')
         results.append(what)
     return results
+    
+def get_blocks(key):
+    return world['blocks'].get(key)
 
 def pop_node(key):
     sk = key  # spatial key

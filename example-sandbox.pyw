@@ -89,6 +89,15 @@ while not done:
                     print("You have " + str(get_whats(get_unit_value('me', 'items'))))
                 else:
                     print("You can't dig any deeper")
+            elif event.key == pg.K_INSERT:
+                if len(items) > 0:
+                    a = get_selected_node_key()
+                    blocks = get_blocks(a)
+                    #if blocks is not None:
+                    items = get_unit_value('me', 'items')
+                    item = items[-1]
+                    del items[-1]
+                    blocks.append(item)
             elif event.key == pg.K_ESCAPE:
                 done = True
         elif event.type == pg.KEYUP:

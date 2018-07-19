@@ -1,6 +1,14 @@
 # mgep
 Minimal Game Engine for Pygame - More Assumptions, Less Typing
 
+
+## Primary Features
+* Why procedural:
+  * less typing is required
+  * any save method that takes dictionary can save game data
+* responsive scaling for any narrow or wide screen ratio (maintain pixel size)
+* load sprites quickly and easily with specialized load_material, load_character, 
+
 ## Known Issues
 * allow custom delay_count
 * is iterator logic from pygame wiki's spritesheets wrong (the index
