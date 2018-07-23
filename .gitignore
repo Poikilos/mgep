@@ -104,3 +104,4 @@ venv.bak/
 .mypy_cache/
 /.directory
 /.README.md.kate-swp
+/settings-mgep.json

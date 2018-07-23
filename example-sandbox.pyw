@@ -20,11 +20,11 @@ if os.path.basename(os.path.dirname(os.path.abspath(__file__))) == mgep_name:
     print("file in:" + currentdir)
     parentdir = currentdir  # os.path.dirname(currentdir)
     print("parentdir:" + parentdir)
-    sys.path.insert(0, parentdir)
+    sys.path.append(parentdir)  # insert(0, parentdir)
 if mgep_name == "mgep":
     try:
         from mgep import *
-    except:
+    except ImportError:
         print("missing mgep.")
         print("try the following in git shell from your project directory:")
         print("git clone https://github.com/poikilos/mgep")
@@ -42,6 +42,7 @@ screen = pg.display.set_mode((400, 300), pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZA
 # screen = pg.display.set_mode((720, 400),pg.FULLSCREEN)
 # screen = pg.display.set_mode((640, 480),pg.FULLSCREEN)
 clock = pg.time.Clock()
+set_visual_debug(True)
 done = False
 
 #load_tileset("tiny-16-basic/basictiles.png", 8, 15)
@@ -86,20 +87,24 @@ while not done:
                 item = pop_node(a)
                 if item is not None:
                     items.append(item)
-                    print("You have " + str(get_whats(get_unit_value('me', 'items'))))
+                    show_popup("You have " + str(get_whats(get_unit_value('me', 'items'))))
                 else:
-                    print("You can't dig any deeper")
-            elif event.key == pg.K_INSERT:
+                    show_popup("You can't dig any deeper")
+            elif event.key == pg.K_INSERT:  # or event.key == pg.K_PAGEDOWN:
+                items = get_unit_value('me', 'items')
                 if len(items) > 0:
                     a = get_selected_node_key()
                     blocks = get_blocks(a)
                     #if blocks is not None:
-                    items = get_unit_value('me', 'items')
                     item = items[-1]
                     del items[-1]
                     blocks.append(item)
+                else:
+                    show_popup("You don't have any items")
             elif event.key == pg.K_ESCAPE:
                 done = True
+            elif event.key == pg.K_F3:
+                toggle_visual_debug()
         elif event.type == pg.KEYUP:
             stop_unit('me')
         elif event.type == pg.VIDEORESIZE:
@@ -116,13 +121,13 @@ while not done:
         move_y('me', 1)
     elif pressed[pg.K_s]:
         move_y('me', -1)
-    elif pressed[pg.K_a]:
+    if pressed[pg.K_a]:
         move_x('me', -1)
     elif pressed[pg.K_d]:
         move_x('me', 1)
 
     move_camera_to('me')
-    screen.fill((0, 0, 0))
     draw_frame(screen)
     pg.display.flip()
-    clock.tick(60)
+    clock.tick(200)
+save_world()

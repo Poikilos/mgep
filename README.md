@@ -1,13 +1,18 @@
 # mgep
 Minimal Game Engine for Pygame - More Assumptions, Less Typing
 
+## Authors
+* angles.py by phn on GitHub <https://gist.github.com/phn/1111712/35e8883de01916f64f7f97da9434622000ac0390>
+* for media, see *CREDITS and Attribution text files in media folders
+* all other work by poikilos (Jake Gustafson) unless noted alongside work such as in code comments
 
 ## Primary Features
 * Why procedural:
   * less typing is required
   * any save method that takes dictionary can save game data
-* responsive scaling for any narrow or wide screen ratio (maintain pixel size)
-* load sprites quickly and easily with specialized load_material, load_character, 
+* responsive scaling for any narrow or wide screen ratio (maintain apparent pixel size)
+* load sprites quickly and easily with specialized load_material, load_character, load_character_3x4,
+  which all use tileset from last call to load_tileset
 
 ## Known Issues
 * allow custom delay_count
@@ -15,7 +20,7 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
   is always 1 ahead of the frame)?
 * move frame order logic from SpriteStripAnim to material
 
-## Planned Features
+## Issues
 ~: low-priority
 * Examples
 * Flipping direction of graphics
@@ -32,6 +37,7 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
   * colorize specific parts: select set of colors, or select only >0% saturation area area or only 0% saturation area
 * (~) Sprite constructs with offsets (clothes, weapons, 2-square sprites)
 * (~) Re-edging
+* (~) implement a callback binding system, to avoid issue: since offscreen buffer is used named `scalable_surf` and writing to it before or after calling draw_screen does nothing, and writing to screen after draw_screen doesn't scale what is drawn.
 
 ## Changes
 
@@ -65,6 +71,13 @@ that specifies and attribution license such as CC BY)
 https://github.com/poikilos/mgep/blob/master/LICENSE
 
 ## Developer Notes:
+* camera is considered "in back" of the character, so that purposely z is positive moving away from camera
+* variable naming:
+  * _mps: meters per second
+  * _accel: meters per second squared
+* optional unit values (to override defaults):
+  * `'max_land_mps'`: maximum meters per second land speed
+  * `'max_land_accel'`: maximum meters per second squared land speed
 * col,row (y,x) order is ONLY used for referring to frames in a sprite sheet, and is always starting at 1,1 (which is at pixel position 0,0)
 * loc or location (col,row format NOT row,col ) is always a cell location in the world database
 * pos is a pixel location in the world (NOT on the screen generally)
@@ -80,9 +93,13 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
     sudo wget https://raw.githubusercontent.com/nachoparker/git-forget-blob/master/git-forget-blob.sh -O /usr/local/bin/git-forget-blob
     sudo chmod +x /usr/local/bin/git-forget-blob
     git-forget-blob sprites/blender-volumetric-particles-effects.zip
-    #git remote add origin https://github.com/poikilos/mgep
+    git remote add origin https://github.com/poikilos/mgep
     #git push -u origin master
     #git push -u origin --all
     #git push --set-upstream origin master
     git push -f origin master
 ```
+  * other notes on purging:
+    * to find the source of a large pack file, you must first get the blob hash from the idx file with the same name:
+      `git verify-pack -v .git/objects/pack/pack-df5efcd46bf13fc31102a4eb682247f674562f07.idx | sort -k 3 -n | tail -10`
+    * then get the filename from the blob hash same as further up (in this example, the corresponding pack file is "sounds/jute-dh-rpgsounds/fire_2.wav")

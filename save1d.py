@@ -2,7 +2,6 @@
 
 import os
 
-
 def _conv(val, as_type, trace_s, trace_n):
     result = None
     if val is not None:
@@ -97,6 +96,13 @@ def load(name, default=None, file_format='list', as_type='string'):
         f.close()
     else:
         return default
+    if result is None:
+        if default is not None:
+            print("ERROR in save1d.load: "
+                  "using None though not default "
+                  "(this should never happen)")
+        # else:
+            # print("WARNING in save1d.load: returning None")
     return result
 
 
