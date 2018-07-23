@@ -37,7 +37,7 @@ else:
 #endregion import pathing
 
 pg.init()
-screen = pg.display.set_mode((400, 300), pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE)
+screen = pg.display.set_mode((1000, 700), pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE)
 #set_scale(2)
 # screen = pg.display.set_mode((720, 400),pg.FULLSCREEN)
 # screen = pg.display.set_mode((640, 480),pg.FULLSCREEN)
