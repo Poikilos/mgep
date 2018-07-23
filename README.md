@@ -9,12 +9,14 @@ This demo is possible using 1 printable page of code in 10pt font
 * all other work by poikilos (Jake Gustafson) unless noted alongside work such as in code comments
 
 ## Primary Features
-* Why procedural:
+* procedural:
   * less typing is required
   * any save method that takes dictionary can save game data
 * responsive scaling for any narrow or wide screen ratio (maintain apparent pixel size)
 * load sprites quickly and easily with specialized load_material, load_character, load_character_3x4,
   which all use tileset from last call to load_tileset
+* framerate-independent sprite animation
+* 3D metric positioning and physics
 
 ## Known Issues
 * allow custom delay_count
