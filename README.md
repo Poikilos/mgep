@@ -1,5 +1,7 @@
 # mgep
 Minimal Game Engine for Pygame - More Assumptions, Less Typing
+![screenshot](https://raw.githubusercontent.com/poikilos/mgep/master/screenshot.jpg)
+This demo is possible using 1 printable page of code in 10pt font
 
 ## Authors
 * angles.py by phn on GitHub <https://gist.github.com/phn/1111712/35e8883de01916f64f7f97da9434622000ac0390>
