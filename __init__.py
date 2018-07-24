@@ -27,7 +27,7 @@ try:
 except ImportError:
     print("ERROR: save1d library not found.")
     exit(1)
-    
+
 
 TAU = math.pi * 2.
 NEG_TAU = -TAU
@@ -36,7 +36,6 @@ kEpsilon = 1.0E-6 # adjust to suit.  If you use floats, you'll
                   # by expertmm [tested: using 1.0E-6 since python 3
                   # fails to set 3.1415927 to 3.1415926
                   # see delta_theta in KivyGlops]
-
 # the world is a dict of lists (multiple gobs can be on one location)
 block_thickness_as_y = 1
 tilesets = {}
@@ -57,24 +56,24 @@ popup_shadow_surf = None
 popup_sec = 0
 popup_alpha = 0
 visual_debug_enable = False
+bindings = {}
+bindings['draw_ui'] = []
 
-
-def load(name, default=None):  # , file_format='list', as_type='string'):
-    path = name + '.json'
-    ret = None
-    if os.path.isfile(path):
-        with open(path, "r") as ins:
-            ret = json.load(ins)
+# when: an event name such as 'draw_ui' 
+# f: a function formatted like `def on_draw_ui(e)` so e can be filled
+#    with a dict
+def bind(when, f):
+    global bindings
+    q = bindings.get(when)
+    if q is not None:
+        q.append(f)
     else:
-        ret = default
-    # return save1d.load(name, default=default, file_format=file_format, as_type=as_type)
-    return ret
+        print('ERROR: no "' + str(when) + '" event exists. Try ' +
+              str(list(bindings)))
 
-def save(name, data):  # , file_format='list'):
-    path = name + '.json'
-    #save1d.save(name, data, file_format=file_format)
-    with open(path, "w") as outs:
-        json.dump(data, outs)
+def get_tile_size():
+    global world_tile_size
+    return world_tile_size
 
 def equal_str_content(master, other):
     if master is not None and other is not None:
@@ -107,7 +106,8 @@ settings['text_antialiasing'] = got.get('text_antialiasing', True)
 settings['human_run_slow_mps'] = got.get('human_run_slow_mps', 4.47)
     # 4.47 m/s = 10 miles per hour
 settings['human_walk_mps'] = got.get('human_walk_mps', 3.0)  # approx
-settings['human_walk_accel'] = got.get('human_walk_accel', 3.0)  # approx
+settings['human_walk_accel'] = got.get('human_walk_accel', 3.0)
+    # approx
 settings['human_run_mps'] = got.get('human_run_mps', 6.7)
     # 6.7 m/s = 15 miles per hour
 settings['human_run_accel'] = got.get('human_run_accel', 3.0)  # approx
@@ -126,9 +126,7 @@ if len(spare_keys) > 0:
     print("  " + str(spare_keys))
 
 # print("settings used: " + str(settings))
-
 last_loaded_world_name = None
-
 temp_screen = None
 text_pos = [0, 0]
 last_loaded_path = None
@@ -155,6 +153,25 @@ camera['pos'] = (0, 0, 0)
 scale = None
 desired_scale = None
 screen_half = None
+camera_target_unit_name = None
+
+
+prev_frame_ticks = None
+min_fps_ticks = 1000
+total_ticks = 0
+frame_count = 0
+fps_s = "?"
+scalable_surf = None
+scalable_surf_scale = None
+
+#region reinitialized each frame
+win_size = None
+scaled_size = None
+scaled_block_size = None
+block_half_counts = None
+start_loc = None
+end_loc = None
+#endregion reinitialized each frame
 
 def fmt_f(f, fmt="{0:.1f}", places=1):
     return fmt.format(round(f,places))
@@ -166,6 +183,25 @@ def fmt_vec(vec, fmt="{0:.1f}", places=1):
         ret += sep + fmt.format(round(f,places))
         sep = ", "
     return ret
+
+def load(name, default=None):
+        # , file_format='list', as_type='string'):
+    path = name + '.json'
+    ret = None
+    if os.path.isfile(path):
+        with open(path, "r") as ins:
+            ret = json.load(ins)
+    else:
+        ret = default
+    # return save1d.load(name, default=default, file_format=file_format,
+    #                    as_type=as_type)
+    return ret
+
+def save(name, data):  # , file_format='list'):
+    path = name + '.json'
+    #save1d.save(name, data, file_format=file_format)
+    with open(path, "w") as outs:
+        json.dump(data, outs)
 
 def toggle_visual_debug():
     global visual_debug_enable
@@ -216,7 +252,10 @@ def get_unit_crosshairs_vec3(unit):
 def vec2_from_vec3_via_camera(vec3, src_size, camera_vec2=None):
     global screen_half
     if camera_vec2 is None:
-        camera_vec2 = int(camera['pos'][0] * world_tile_size[0]), int(camera['pos'][2] * world_tile_size[1])
+        camera_vec2 = ( int(math.round(camera['pos'][0] *
+                                       world_tile_size[0])),
+                        int(math.round(camera['pos'][2] *
+                                       world_tile_size[1])) )
     vec2 = vec3[0] * world_tile_size[0], vec3[2] * world_tile_size[1]
     x = (vec2[0] - camera_vec2[0]) + screen_half[0] - src_size[0]/2
     y = -1*(vec2[1] - camera_vec2[1]) + screen_half[1] - src_size[1]/2
@@ -245,27 +284,61 @@ def vec3_changed_1(vec, f):
 def vec3_changed_2(vec, f):
     return (vec[0], vec[1], f)
 
+# This returns ('E', 'N', 'W', 'S') via right-handed angle,
+# not based on real life heading angle.
+# Right-handed angle is E = 0 going counter-clockwise from top
+# view (camera with z>0 facing origin) which sees +x point right
+# (real life heading is N = 0 going clockwise).
+def get_cardinal_deg(angle):
+    ret = None
+    if angle is not None:
+        angle = angles.normalize(angle, lower=45, upper=405)
+        if angle > 225:
+            if angle >= 315:
+                ret = 'E'
+            else:
+                ret = 'S'
+        else:
+            if angle >= 135:
+                ret = 'W'
+            else:
+                if angle <=45:
+                    ret = 'E'
+                else:
+                    ret = 'N'
+    return ret
+    # see also etc/angleQuantization.cpp
+
+def auto_pose(unit, mode='walk'):
+    global materials
+    cardinal = get_cardinal_deg(unit['yaw_deg'])
+    pose = None
+    if cardinal is not None:
+        pose = mode + '.' + cardinal
+    # if amount > 0:
+        # pose = 'walk.E'
+        # unit['yaw_deg'] = 0.0
+    # elif amount < 0:
+        # pose = 'walk.W'
+        # unit['yaw_deg'] = 180.0
+    if pose is not None:
+        material = materials[unit['what']]
+        if pose in material['tmp']['sprites']:
+            reset_enable = False
+            if pose != unit['pose']:
+                reset_enable = True
+            unit['pose'] = pose
+            if reset_enable:
+                material['tmp']['sprites'][pose].iter()
+
 def move_x(name, amount):
     unit = units.get(name)
     if unit is not None:
-        #unit['tmp']['move_multipliers'] = vec3_changed_0(unit['tmp']['move_multipliers'], amount)
+        # unit['tmp']['move_multipliers'] = \
+        #     vec3_changed_0(unit['tmp']['move_multipliers'], amount)
         unit['tmp']['move_multipliers'][0] = amount
-        #unit['pos'] = vec3_changed_0(unit['pos'], amount)
-        if amount > 0:
-            pose = 'walk.E'
-            unit['yaw_deg'] = 0.0
-        elif amount < 0:
-            pose = 'walk.W'
-            unit['yaw_deg'] = 180.0
-        if pose is not None:
-            material = materials[unit['what']]
-            if pose in material['tmp']['sprites']:
-                reset_enable = False
-                if pose != units[name]['pose']:
-                    reset_enable = True
-                units[name]['pose'] = pose
-                if reset_enable:
-                    material['tmp']['sprites'][pose].iter()
+        # unit['pos'] = vec3_changed_0(unit['pos'], amount)
+        # auto_pose(unit, "walk")
     else:
         raise ValueError("Cannot move since no unit '" +
                          name + "'")
@@ -274,23 +347,13 @@ def move_y(name, amount):
     unit = units.get(name)
     pose = None
     if unit is not None:
-        #unit['tmp']['move_multipliers'] = vec3_changed_2(unit['tmp']['move_multipliers'], amount)
+        # unit['tmp']['move_multipliers'] = \
+        #     vec3_changed_2(unit['tmp']['move_multipliers'], amount)
         unit['tmp']['move_multipliers'][2] = amount
-        #unit['pos'] = vec3_changed_2(unit['pos'], amount)
-        if amount > 0:
-            pose = 'walk.N'
-            unit['yaw_deg'] = 90.0
-        elif amount < 0:
-            pose = 'walk.S'
-            unit['yaw_deg'] = -90.0
-        if pose is not None:
-            material = materials[unit['what']]
-            if pose in material['tmp']['sprites']:
-                unit['pose'] = pose
+        # unit['pos'] = vec3_changed_2(unit['pos'], amount)
+        # auto_pose(unit, "walk")
     else:
         raise ValueError("Cannot move since no unit '" + name + "'")
-
-camera_target_unit_name = None
 
 def move_camera_to(name):
     global camera_target_unit_name
@@ -301,13 +364,6 @@ def move_camera_to(name):
     else:
         raise ValueError("Cannot move_camera_to since no unit '" +
                          name + "'")
-
-
-# graphical object
-#class Gob():
-#    
-#    def __init__(self):
-#        self.pos = (0,0)
 
 
 # Spritesheet class from https://www.pygame.org/wiki/Spritesheet
@@ -330,7 +386,8 @@ class SpriteSheet(object):
         if colorkey is not None:
             image = pg.Surface(rect.size).convert()
         else:
-            image = pg.Surface(rect.size, flags=pg.SRCALPHA) #.convert_alpha()
+            image = pg.Surface(rect.size, flags=pg.SRCALPHA)
+                # .convert_alpha()
         image.blit(self.sheet, (0, 0), rect)
         if colorkey is not None:
             if colorkey is -1:
@@ -365,7 +422,8 @@ class SpriteStripAnim(object):
     order: a list of indices (starting at 1) in case frames should be
            used out of order
     """
-    def __init__(self, path, rect, count, colorkey=None, loop=False, delay_count=1, order=None):
+    def __init__(self, path, rect, count, colorkey=None, loop=False,
+                 delay_count=1, order=None):
         """construct a SpriteStripAnim
         
         path, rect, count, and colorkey are the same arguments used
@@ -417,10 +475,11 @@ class SpriteStripAnim(object):
             new_i = self.order[self.oi] - 1  # -1 since starts at 1
             if new_i >= 0 and new_i < len(self.images):
                 self.i = new_i
-                # do NOT set self.image = self.images[self.i] here since
-                # using iterator logic (see __next__) which increments only
+                # do NOT set self.image = self.images[self.i] here, as
+                # using iterator logic (see __next__) which increments
+                # only
             else:
-                raise ValueError("Bad order index (should start at 1) " +
+                raise ValueError("Bad order index (should be >=1) " +
                                  str(new_i))
         else:
             raise RuntimeError("Cannot _go_to_order with no order.")
@@ -457,31 +516,6 @@ class SpriteStripAnim(object):
         return self
 
 
-#def set_screen(s):
-#    global screen
-#    screen = s
-
-#def init():
-#    global settings
-#    if settings is None:
-
-prev_frame_ticks = None
-min_fps_ticks = 1000
-total_ticks = 0
-frame_count = 0
-fps_s = "?"
-scalable_surf = None
-scalable_surf_scale = None
-
-#region reinitialized each frame
-win_size = None
-scaled_size = None
-scaled_block_size = None
-block_half_counts = None
-start_loc = None
-end_loc = None
-#endregion reinitialized each frame
-
 shown_node_graphics_warnings = {}
 
 # Set node['yaw'] if pose ends in ".E" (0 degrees) or other cardinal 
@@ -506,6 +540,18 @@ def set_yaw_from_pose(node, default=-90.0, always_set=False):
                     node['yaw'] = default
             elif yaw is None and always_set:
                 node['yaw'] = default
+
+def get_anim_from_mat_name(what, pose=None):
+    global materials
+    ret = None
+    material = materials.get(what)
+    if material is not None:
+        if pose is None:
+            pose = material.get('default_pose')
+        if pose not in material['tmp']['sprites']:
+            pose = random.choice(list(material['tmp']['sprites']))
+        ret = material['tmp']['sprites'][pose]
+    return ret
 
 def get_anim_from_node(node):
     global materials
@@ -548,12 +594,6 @@ def get_anim_from_node(node):
             shown_node_graphics_warnings[name] = True
     return anim
 
-# def get_offscreen_buffer():
-#     global scalable_surf
-#     return scalable_surf
-
-
-
 def draw_frame(screen):
     global settings
     global temp_screen
@@ -577,7 +617,6 @@ def draw_frame(screen):
     global popup_text
     global popup_alpha
     global popup_sec
-
     global prev_frame_ticks
     global total_ticks
     global frame_count
@@ -604,11 +643,14 @@ def draw_frame(screen):
         prev_frame_ticks = this_frame_ticks
     
     if default_font is None:
-        default_font = pg.font.SysFont(settings['sys_font_name'], int(settings['sys_font_size']))
+        default_font = pg.font.SysFont(settings['sys_font_name'],
+                                       int(settings['sys_font_size']))
     text_pos = [4,4]
     # pg.draw.rect(screen, color, pg.Rect(x, y, 64, 64))
     new_win_size = screen.get_size()
-    if win_size is None or win_size[0] != new_win_size[0] or win_size[1] != new_win_size[1]:
+    if (win_size is None or
+            win_size[0] != new_win_size[0] or
+            win_size[1] != new_win_size[1]):
         win_size = screen.get_size()
         scale = None
         scalable_surf = None
@@ -628,21 +670,26 @@ def draw_frame(screen):
             scale = desired_scale
     scaled_size = win_size[0] / scale, win_size[1] / scale
     if scalable_surf is None or scale != scalable_surf_scale:
-        scalable_surf = pg.Surface((int(scaled_size[0]), int(scaled_size[1]))).convert()  # , flags=pg.SRCALPHA)
+        scalable_surf = pg.Surface((int(scaled_size[0]),
+            int(scaled_size[1]))).convert()  # , flags=pg.SRCALPHA)
         scalable_surf_scale = scale
         temp_screen = scalable_surf
 
     scalable_surf.fill((0, 0, 0))
     #camera_loc = get_loc_at_px(camera['pos'])
     camera_loc = get_loc_at_pos(camera['pos'])
-    scaled_block_size = world_tile_size[0] * scale, world_tile_size[1] * scale
-    block_counts = math.ceil(scaled_size[0] / world_tile_size[0]), math.ceil(scaled_size[1] / world_tile_size[1])
-    block_half_counts = int(block_counts[0] / 2) + 1, int(block_counts[1] / 2) + 1
-    # reverse the y order so larger depth value is drawn below other layers
-    # (end_loc's y is NEGATIVE on purpose due to draw order)
+    scaled_block_size = (world_tile_size[0] * scale,
+                         world_tile_size[1] * scale)
+    block_counts = (math.ceil(scaled_size[0] / world_tile_size[0]),
+                    math.ceil(scaled_size[1] / world_tile_size[1]))
+    block_half_counts = (int(block_counts[0] / 2) + 1,
+                         int(block_counts[1] / 2) + 1)
+    # reverse the y order so larger depth value is drawn below other
+    # layers (end_loc's y is NEGATIVE on purpose due to draw order)
     max_stack_preload_count = 5
     extra_count = max_stack_preload_count * block_thickness_as_y
-    start_loc = camera_loc[0] - block_half_counts[0], camera_loc[1] + block_half_counts[1]
+    start_loc = (camera_loc[0] - block_half_counts[0],
+                 camera_loc[1] + block_half_counts[1])
     end_loc = (camera_loc[0] + block_half_counts[0],
                camera_loc[1] - block_half_counts[1] - extra_count)
     global screen_half
@@ -651,7 +698,8 @@ def draw_frame(screen):
     blocks = world["blocks"]
     # for k, v in blocks.items():
     block_y = start_loc[1]
-    camera_px = int(camera['pos'][0] * world_tile_size[0]), int(camera['pos'][2] * world_tile_size[1])
+    camera_px = (int(camera['pos'][0] * world_tile_size[0]),
+                 int(camera['pos'][2] * world_tile_size[1]))
     while block_y >= end_loc[1]:
         block_x = start_loc[0]
         while block_x <= end_loc[0]:
@@ -669,15 +717,18 @@ def draw_frame(screen):
                     anim = get_anim_from_node(node)
                     if anim is not None:
                         src_size = anim.get_surface().get_size()
-                        x = pos[0]-camera_px[0] + screen_half[0] - src_size[0]/2
+                        x = ((pos[0]-camera_px[0]) + screen_half[0] -
+                             src_size[0]/2)
                         # if x+w < 0 or x >= win_size[0]:
                         #     continue
-                        y = -1*(pos[1]-camera_px[1]) + screen_half[1] - src_size[1]/2
+                        y = (-1*(pos[1]-camera_px[1]) + screen_half[1] -
+                             src_size[1]/2)
                         # if y+w < 0 or y >= win_size[0]:
                         #     continue
                         # if k=="me":
                         #     print("me at " + str((x,y)))
-                        scalable_surf.blit(anim.get_surface(), (x,y-offset))
+                        scalable_surf.blit(anim.get_surface(),
+                                           (x, y-offset))
                         animate = node.get('animate')
                         if animate is True:
                             anim.advance()
@@ -685,7 +736,8 @@ def draw_frame(screen):
             block_x += 1
         block_y -= 1
     global camera_target_unit_name
-    for k, unit in units.items():  # TODO: check for python2 units.iteritems()
+    for k, unit in units.items():
+            # TODO: check for python2 units.iteritems()
         material = materials[unit['what']]
         anim = material['tmp']['sprites'][unit['pose']]
         moved_vec3 = [0.0, 0.0, 0.0]
@@ -701,7 +753,8 @@ def draw_frame(screen):
                 push_text("WARNING: desired_multiplier is " +
                           str(desired_multiplier) + " (should be <=1)")
                 desired_multiplier = 1.0
-            mla = unit.get('max_land_accel', settings['human_run_accel'])
+            mla = unit.get('max_land_accel',
+                           settings['human_run_accel'])
             desired_accel = desired_multiplier * mla
             ls_x = unit['mps_vec3'][0]
             ls_y = unit['mps_vec3'][2]
@@ -711,34 +764,55 @@ def draw_frame(screen):
                 ls -= (decel) * passed
             else:
                 ls += desired_accel * passed
-
+            heading = math.radians(unit['yaw_deg'])
+            course = heading  # refined below if moving
             if ls > mls:
                 ls = mls
+                course = math.atan2(ls_y, ls_x)
             elif ls <= kEpsilon:
                 ls = 0.0
-            heading = math.atan2(ls_y, ls_x)  # current heading
+            # heading = math.radians(unit['yaw_deg'])
+            prev_heading = heading
+            mode = 'idle'
+            pose = unit.get('pose')
+            parts = pose.split(".")
+            prev_mode = parts[0]
             if desired_multiplier > kEpsilon:
                 heading = dest_heading   # TODO: rotate toward
+                unit['yaw_deg'] = math.degrees(heading)
+                mode = 'walk'
+                if mode != prev_mode: anim.iter()  # reset to frame 0
             unit['mps_vec3'][0] = ls * math.cos(heading)
             unit['mps_vec3'][2] = ls * math.sin(heading)
-            
+
             moved_vec3 = (unit['mps_vec3'][0] * passed,
                           unit['mps_vec3'][1] * passed,
                           unit['mps_vec3'][2] * passed)
+            auto_pose(unit, mode=mode)
+            pose = unit.get('pose')
             if visual_debug_enable:
-                push_text(k+":")
-                pose = unit.get('pose')
-                push_text("  pose: " + str(pose))
-                push_text("  max_land_mps: " + fmt_f(mls))
-                push_text("  unit['tmp']['move_multipliers']: " + fmt_vec(unit['tmp']['move_multipliers']))
-                push_text("  dest_heading: " + fmt_f(math.degrees(dest_heading)))
-                push_text("  speed_vec3: " + fmt_vec((ls_x, 0.0, ls_y)))
-                push_text("  desired_accel: " + fmt_f(desired_accel))
-                push_text("  unit['mps_vec3']: " + fmt_vec(unit['mps_vec3']))
-                push_text("  moved_vec3: " + fmt_vec(moved_vec3))
-            
+                if k == player_unit_name:
+                    push_text(k+":")
+                    push_text("  yaw_deg: " + str(unit['yaw_deg']))
+                    push_text("  prev_heading: " +
+                              str(math.degrees(prev_heading)))
+                    push_text("  heading: " + str(math.degrees(heading)))
+                    push_text("  pose: " + str(pose))
+                    push_text("  max_land_mps: " + fmt_f(mls))
+                    push_text("  unit['tmp']['move_multipliers']: " +
+                              fmt_vec(unit['tmp']['move_multipliers']))
+                    push_text("  dest_heading: " +
+                              fmt_f(math.degrees(dest_heading)))
+                    push_text("  speed_vec3: " +
+                              fmt_vec((ls_x, 0.0, ls_y)))
+                    push_text("  desired_accel: " +
+                              fmt_f(desired_accel))
+                    push_text("  unit['mps_vec3']: " +
+                              fmt_vec(unit['mps_vec3']))
+                    push_text("  moved_vec3: " + fmt_vec(moved_vec3))
+
             # NOTE: atan2 takes y,x and returns radians
-            dist_per_frame = 0.5  # TODO: make setting and override for this
+            dist_per_frame = 0.5  # TODO: make setting and override
             if unit['animate']:
                 msa = unit['tmp'].get('moved_since_advance')
                 if msa is None:
@@ -759,7 +833,9 @@ def draw_frame(screen):
         # center_tile_tl_pos = (0,0)
         #unit['pos'][0] += moved_vec3[0]
         #unit['pos'][1] + moved_vec3[2]
-        pos = vec3[0] + moved_vec3[0], vec3[1] + moved_vec3[1], vec3[2] + moved_vec3[2]
+        pos = (vec3[0] + moved_vec3[0],
+               vec3[1] + moved_vec3[1],
+               vec3[2] + moved_vec3[2])
         unit['pos'] = pos
         sk = get_key_at_pos(pos)
         offset = -1
@@ -769,34 +845,51 @@ def draw_frame(screen):
         src_size = anim.get_surface().get_size()
         # if x+w < 0 or x >= win_size[0]:
         #     continue
-        x, y = vec2_from_vec3_via_camera(pos, (src_size[0], src_size[1]*1.66), camera_vec2=camera_px)
+        x, y = vec2_from_vec3_via_camera(pos,
+                                         (src_size[0],
+                                          src_size[1]*1.66),
+                                         camera_vec2=camera_px)
         # if y+w < 0 or y >= win_size[0]:
         #     continue
         # if k=="me":
         #     print("me at " + str((x,y)))
         scalable_surf.blit(anim.get_surface(), (x,y-offset))
         # surface = next(anim)
+        target_size = (1, 1)
         if k == player_unit_name:
             target = get_unit_crosshairs_vec3(unit)
-            x, y = vec2_from_vec3_via_camera(target, (3,3), camera_vec2=camera_px)
+            x, y = vec2_from_vec3_via_camera(target, (3,3),
+                                             camera_vec2=camera_px)
             color = (200, 10, 0)
-            pg.draw.rect(scalable_surf, color, pg.Rect(x, y, 1, 1))
-            
-        
+            pg.draw.rect(scalable_surf,
+                         color,
+                         pg.Rect(x-int(target_size[0]/2),
+                                 y-int(target_size[1]/2),
+                                 target_size[0],
+                                 target_size[1])
+                        )
 
     if visual_debug_enable:
         push_text("FPS: " + fps_s)
 
     if (popup_surf is None) or (popup_showing_text != popup_text):
         if popup_text is not None:
-            popup_surf = default_font.render(popup_text, settings['text_antialiasing'], (255, 255, 255))
-            popup_shadow_surf = default_font.render(popup_text, False, (0, 0, 0))
+            popup_surf = default_font.render(
+                popup_text, settings['text_antialiasing'],
+                (255, 255, 255)
+            )
+            popup_shadow_surf = default_font.render(popup_text,
+                                                    False, (0, 0, 0))
             popup_sec = settings["popup_sec_per_glyph"] * len(popup_text)
             popup_alpha = 255
             settings["popup_sec_per_character"] = .04
         else:
-            popup_surf = default_font.render("", settings['text_antialiasing'], (255, 255, 255))
-            popup_shadow_surf = default_font.render("", settings['text_antialiasing'], (0, 0, 0))
+            popup_surf = default_font.render(
+                "", settings['text_antialiasing'], (255, 255, 255)
+            )
+            popup_shadow_surf = default_font.render(
+                "", settings['text_antialiasing'], (0, 0, 0)
+            )
         popup_showing_text = popup_text
 
     if popup_surf is not None:
@@ -806,12 +899,20 @@ def draw_frame(screen):
             if popup_sec <= 0:
                 popup_shadow_surf.set_alpha(popup_alpha)
                 popup_surf.set_alpha(popup_alpha)
-            scalable_surf.blit(popup_shadow_surf,(text_pos[0]+2,text_pos[1]+1))
-            scalable_surf.blit(popup_surf,(text_pos[0],text_pos[1]))
+            scalable_surf.blit(popup_shadow_surf,
+                               (text_pos[0]+2,text_pos[1]+1))
+            scalable_surf.blit(popup_surf,
+                               (text_pos[0],text_pos[1]))
             text_size = popup_surf.get_size()
             text_pos[1] += text_size[1]
             popup_alpha -= settings["popup_alpha_per_sec"] * passed
-    screen.blit(pg.transform.scale(scalable_surf, (int(win_size[0]),int(win_size[1]))),(0,0))
+    global bindings
+    q = bindings.get('draw_ui')
+    for f in q:
+        f({'screen':scalable_surf})
+    screen.blit(pg.transform.scale(scalable_surf,
+                                   (int(win_size[0]),int(win_size[1]))),
+                (0,0))
     show_stats_once()
     if camera_target_unit_name is not None:
             move_camera_to(camera_target_unit_name)
@@ -830,17 +931,30 @@ def show_stats_once():
         print("scale: " + str(scale))
     show_stats_enable = False
 
+def draw_text_vec2(s, color, surf, vec2):
+    global default_font
+    if default_font is None:
+        default_font = pg.font.SysFont(settings['sys_font_name'],
+                                       int(settings['sys_font_size']))
+    if surf is not None:
+        s_surf = default_font.render(s, settings['text_antialiasing'],
+                                     color)
+        text_size = s_surf.get_size()
+        surf.blit(s_surf, (vec2[0],vec2[1]))
+
 def push_text(s, color=(255,255,255), screen=None):
     global text_pos
     global temp_screen
     global settings
     global default_font
     if default_font is None:
-        default_font = pg.font.SysFont(settings['sys_font_name'], int(settings['sys_font_size']))
+        default_font = pg.font.SysFont(settings['sys_font_name'],
+                                       int(settings['sys_font_size']))
     if screen is not None:
         temp_screen = screen
     if temp_screen is not None:
-        s_surf = default_font.render(s, settings['text_antialiasing'], color)
+        s_surf = default_font.render(s, settings['text_antialiasing'],
+                                     color)
         text_size = s_surf.get_size()
         temp_screen.blit(s_surf, (text_pos[0],text_pos[1]))
         text_pos[1] += text_size[1]
@@ -969,7 +1083,7 @@ def load_material(what, column, row, gettable=True,
         world_tile_size = tilesets[path]['tile_size']
         print("world_tile_size from material: " + str(world_tile_size))
 
-#   same as load_material but with different defaults
+# same as load_material but with different defaults
 def load_character(what, column, row, gettable=False,
                   pose=None, path=None, has_ai=False,
                   native=False, overlayable=True,
@@ -1020,55 +1134,18 @@ def _place_unit(what, name, pos, pose=None, animate=True):
     units[name]['mps_vec3'] = [0.0, 0.0, 0.0]
     units[name]['tmp']['move_multipliers'] = [0.0, 0.0, 0.0]
 
-# This returns ('E', 'N', 'W', 'S') via right-handed angle,
-# not based on real life heading angle.
-# Real life heading is N = 0 going clockwise,
-# whereas right-handed angle is E = 0 going counter-clockwise from top
-# view (camera with z>0 facing origin) which sees +x point right.
-def get_cardinal_deg(angle):
-    ret = None
-    if angle is not None:
-        angle = angles.normalize(angle, lower=45, upper=405)
-        if angle > 225:
-            if angle > 315:
-                ret = 'E'
-            else:
-                ret = 'S'
-        else:
-            if angle > 135:
-                ret = 'W'
-            else:
-                ret = 'N'
-    return ret
-    # 8-directional quantization below is from
-    # <https://www.gamedev.net/forums/topic/679371-3d-8-directional-
-    #  sprite-rotation-based-on-facing-direction-relative-to-
-    #  camera-direction/>
-    # # Camera facing direction (in 2D)
-    # # Direction is the direction at which the camera is looking at ( in 2D )
-    # vec2 camera = vec2(
-    #            cos(degtorad(CCamera::GetMainCamera()->transform.direction)),
-    #            -sin(degtorad (CCamera::GetMainCamera()->transform.direction)));  #  Object facing direction (in 2D)
-    #               # direction is the facing direction of the sprite, i.e. the direction at which the sprite is Looking At. ( in 2D )
-    # vec2 facing = vec2(
-    #            cos(degtorad(self->transform->direction)),
-    #            -sin(degtorad(self->transform->direction)));  # Dot product
-    # double cosine = dot(camera, facing);
-    # double angle = radtodeg(arctan2(facing.y, facing.x) - arctan2(camera.y, camera.x));
-    # if (angle > 90.0) {
-    #     angle = 450.0 - angle; }
-    # else {
-    #    angle = 90.0 - angle;}
-    # self->sprite = sprite_set[floor(angle / 45.0)];
-
 def stop_unit(name):
     unit = units[name]
     material = materials[unit['what']]
-    direction = get_cardinal_deg(unit.get('yaw_deg'))
+    # direction = get_cardinal_deg(unit.get('yaw_deg'))
     unit['tmp']['move_multipliers'] = [0.0, 0.0, 0.0]
-    pose = 'idle'
-    if direction is not None:
-        pose = 'idle.' + direction
+    mode = 'idle'
+    auto_pose(unit, mode=mode)
+    pose = unit.get('pose')
+    if mode + "." not in pose:
+        pose = 'idle'
+    # if direction is not None:
+        # pose = 'idle.' + direction
     if pose in material['tmp']['sprites']:
         unit['pose'] = pose
     else:
@@ -1092,7 +1169,8 @@ def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
         file_surfaces[path] = surf
     w, h = surf.get_size()
     tilesets[path] = {}
-    u_size = w-margin_l-margin_r+spacing_x, h-margin_t-margin_b+spacing_y
+    u_size = (w-margin_l-margin_r+spacing_x,
+              h-margin_t-margin_b+spacing_y)
     f_s = u_size[0]/count_x-spacing_x, u_size[1]/count_y-spacing_y
     tilesets[path]['tile_size'] = int(f_s[0]), int(f_s[1])
     t_s = tilesets[path]['tile_size']
@@ -1101,19 +1179,13 @@ def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
         raise ValueError("tileset geometry is nonsensical: derived "
               "tile size " + str(f_s) + " should be whole number > 0")
 
-#def setup_game(set_materials, tile_size=32):
-#    global materials
-#    materials = set_materials
-#
-#    if os.path.isfile("world.json"):
-#        pass
-
 def get_loc_at_pos(pos):
     world_loc = (int(pos[0]), int(pos[2]))
     return world_loc
 
 def get_loc_at_px(vec2):
-    world_loc = int(vec2[0] / world_tile_size[0]), int(vec2[1] / world_tile_size[1])
+    world_loc = (int(vec2[0] / world_tile_size[0]),
+                 int(vec2[1] / world_tile_size[1]))
     return world_loc
 
 def get_gobs_at(loc):
@@ -1217,14 +1289,17 @@ def load_world(name, generate=False):
                         materials[node['what']].get('default_animate')
                     if default_animate is True: 
                         node['animate'] = True
-                    #else None or False so don't waste storage space
+                    # else None or False so don't waste storage space
                     material = materials[node['what']]
                     # converting a dict to a list yields the keys:
-                    node['pose'] = random.choice(list(material['tmp']['sprites']))
-                    #print("generated " + node['what'] + " pose " + node['pose'] + " at " + sk)
+                    node['pose'] = random.choice(
+                        list(material['tmp']['sprites'])
+                    )
+                    # print("generated " + node['what'] + " pose " +
+                    #       node['pose'] + " at " + sk)
                     blocks[sk].append(node)
-                #else:
-                    #print("generated None at " + sk)
+                # else:
+                    # print("generated None at " + sk)
     _place_world()
 
 if __name__ == "__main__":

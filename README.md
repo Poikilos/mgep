@@ -75,10 +75,12 @@ that specifies and attribution license such as CC BY)
 https://github.com/poikilos/mgep/blob/master/LICENSE
 
 ## Developer Notes:
-* camera is considered "in back" of the character, so that purposely z is positive moving away from camera
+* camera is similar to default opengl view space camera, where z is positive moving toward camera (but tilted upward, greater z also moves down toward bottom of screen)
 * variable naming:
   * _mps: meters per second
   * _accel: meters per second squared
+  * pose is a string referring to an animation, structured as `mode+'.'+cardinal` where cardinal is a direction ssuch as `'walk.N'`
+  * heading is direction pointing, course is direction moving
 * optional unit values (to override defaults):
   * `'max_land_mps'`: maximum meters per second land speed
   * `'max_land_accel'`: maximum meters per second squared land speed
