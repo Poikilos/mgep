@@ -31,22 +31,26 @@ except ImportError:
 
 TAU = math.pi * 2.
 NEG_TAU = -TAU
+sqrt_2 = math.sqrt(2.0)
 kEpsilon = 1.0E-6 # adjust to suit.  If you use floats, you'll
                   # probably want something like 1.0E-7 (added
                   # by expertmm [tested: using 1.0E-6 since python 3
                   # fails to set 3.1415927 to 3.1415926
                   # see delta_theta in KivyGlops]
 # the world is a dict of lists (multiple gobs can be on one location)
-block_thickness_as_y = 1
+#good_45deg_tile_sizes = [(17,12), (34,24), (41,29), (58,41), (75,53), (92,65)]
+good_45deg_tile_sizes = []
+
+block_rise_as_y_px = 1
 tilesets = {}
 file_surfaces = {}
 materials = {}
 material_choose = [None]
 world = {}
-world["blocks"] = {}
+world['blocks'] = {}
 #screen = None
 player_unit_name = None
-world_tile_size = None
+game_tile_size = None
 units = {}
 default_font = None
 popup_text = ""
@@ -72,8 +76,8 @@ def bind(when, f):
               str(list(bindings)))
 
 def get_tile_size():
-    global world_tile_size
-    return world_tile_size
+    global game_tile_size
+    return game_tile_size
 
 def equal_str_content(master, other):
     if master is not None and other is not None:
@@ -90,6 +94,25 @@ def get_spare_keys(master, other):
                 ret.append(k)
     return ret
 
+def abs_slack(f):
+    if f < 0.0:
+        return abs(f - float(int(f)))  # such as abs(-1.1 - -1.0) = .1
+    else:
+        return f - float(int(f))  # such as 1.1 - 1.0 = .1
+    return None
+
+w = 16
+while w<=1024:
+    two_h = float(w) * sqrt_2
+    h = two_h / 2.0
+    if int(round(h)) * 2 == int(two_h) and abs_slack(two_h) < .15:
+        good_45deg_tile_sizes.append((w, int(h)))
+        #print(str((w, int(h))))
+    #else:
+        #print("NOT " + str((w, int(h))))
+        #print("  abs_slack: " + str(abs_slack(two_h)))
+        #print("  two_h: " + str(two_h))
+    w += 1
 data = None
 settings_path = "settings-mgep.json"
 if os.path.isfile(settings_path):
@@ -115,6 +138,7 @@ settings['human_run_max_mps'] = got.get('human_run_max_mps', 12.4)
     # 12.4 m/s = 27.8 miles per hour
 settings['sys_font_name'] = got.get('sys_font_name', 'Arial')
 settings['sys_font_size'] = got.get('sys_font_size', 12)
+settings['default_world_gravity'] = got.get('default_world_gravity', 9.8)
     # pygame only accepts int
 if not equal_str_content(settings, got):
     with open(settings_path, "w") as outs:
@@ -150,7 +174,7 @@ last_loaded_path = None
 
 camera = {}
 camera['pos'] = (0, 0, 0)
-scale = None
+block_scale_horz = None
 desired_scale = None
 screen_half = None
 camera_target_unit_name = None
@@ -161,12 +185,12 @@ min_fps_ticks = 1000
 total_ticks = 0
 frame_count = 0
 fps_s = "?"
-scalable_surf = None
-scalable_surf_scale = None
+#scalable_surf = None
+#scalable_surf_scale = None
 
 #region reinitialized each frame
 win_size = None
-scaled_size = None
+#scaled_size = None
 scaled_block_size = None
 block_half_counts = None
 start_loc = None
@@ -222,13 +246,13 @@ def show_popup(s):
     popup_alpha = 255
 
 def set_scale(whole_number):
-    global scale
+    global block_scale_horz
     global desired_scale
-    scale = int(round(whole_number))
-    desired_scale = scale
+    block_scale_horz = int(round(whole_number))
+    desired_scale = block_scale_horz
 
 def get_key_at_px(vec2):
-    w, h = world_tile_size  # tilesets[path]['tile_size']
+    w, h = game_tile_size  # tilesets[path]['tile_size']
     col = int(round(vec2[0] / w))
     row = int(round(vec2[2] / h))
     return str(col) + "," + str(row)
@@ -239,7 +263,7 @@ def get_key_at_pos(pos):
     return str(col) + "," + str(row)
 
 def get_unit_crosshairs_vec3(unit):
-    global world_tile_size
+    global game_tile_size
     pos = [ unit['pos'][0], unit['pos'][1], unit['pos'][2] ]
     # offsets = [0,0]
     offsets = ( math.cos(math.radians(unit['yaw_deg'])), 
@@ -249,17 +273,20 @@ def get_unit_crosshairs_vec3(unit):
 
 # camera_vec2 is not required. Provide if known for performance,
 # otherwise will be calculated using camera['pos']
-def vec2_from_vec3_via_camera(vec3, src_size, camera_vec2=None):
+def vec2_from_vec3_via_camera(vec3, camera_vec2=None): #src_size, 
     global screen_half
+    global scaled_block_size
+    global block_rise_as_y_px
     if camera_vec2 is None:
         camera_vec2 = ( int(math.round(camera['pos'][0] *
-                                       world_tile_size[0])),
+                                       scaled_block_size[0])),
                         int(math.round(camera['pos'][2] *
-                                       world_tile_size[1])) )
-    vec2 = vec3[0] * world_tile_size[0], vec3[2] * world_tile_size[1]
-    x = (vec2[0] - camera_vec2[0]) + screen_half[0] - src_size[0]/2
-    y = -1*(vec2[1] - camera_vec2[1]) + screen_half[1] - src_size[1]/2
-    y += -vec3[1] * world_tile_size[1]
+                                       scaled_block_size[1])) )
+    world2 = (vec3[0] * scaled_block_size[0],
+            vec3[2] * scaled_block_size[1])
+    x = (world2[0] - camera_vec2[0]) + screen_half[0] #- src_size[0]/2
+    y = -1*(world2[1] - camera_vec2[1]) + screen_half[1] #- src_size[1]/2
+    y += -vec3[1] * block_rise_as_y_px
     return (x, y)
 
 def get_selected_node_key():
@@ -593,22 +620,47 @@ def get_anim_from_node(node):
             print("There are no graphics for node '" + name + "'")
             shown_node_graphics_warnings[name] = True
     return anim
+    
+def unit_jump(name, vel_y, vel_x=None, vel_z=None, max_y=kEpsilon):
+    blocks = world['blocks']
+    unit = units.get(name)
+    if unit is not None:
+        sk = get_key_at_pos(unit['pos'])
+        ground_y = -10.0
+        stack = blocks.get(sk)
+        if stack is not None:
+            ground_y = float(len(stack))
+            #offset = len(stack) * block_rise_as_y_px
+        
+        if unit['pos'][1] - ground_y <= max_y:
+            if (ground_y >= 0.0) or (max_y > kEpsilon):
+                    # either on ground or allow double jump
+                mps = unit['mps_vec3']
+                if vel_y is None:
+                    vel_y = 0.0
+                if vel_x is None:
+                    vel_x = 0.0
+                if vel_z is None:
+                    vel_z = 0.0
+                unit['mps_vec3'] = [mps[0] + vel_x, mps[1] + vel_y, mps[2] + vel_z]
+                return True
+    return False
 
 def draw_frame(screen):
     global settings
     global temp_screen
     global text_pos
     global win_size
-    global scaled_size
+    #global scaled_size
     global scaled_block_size
     global block_half_counts
     global start_loc
     global end_loc
-    global block_thickness_as_y
-    global scale
+    global block_rise_as_y_px
+    global block_scale_horz
     global desired_scale
-    global scalable_surf
-    global scalable_surf_scale
+    #global scalable_surf
+    #global scalable_surf_scale
     global visual_debug_enable
     global default_font
     global popup_showing_text
@@ -620,11 +672,14 @@ def draw_frame(screen):
     global prev_frame_ticks
     global total_ticks
     global frame_count
+    global good_45deg_tile_sizes
     passed = 0.0  # seconds
     passed_ms = 0
     this_frame_ticks = pg.time.get_ticks() 
     fps = 0.0  # clock.get_fps()
     global fps_s
+    global world
+    frame_gravity = None
     if prev_frame_ticks is not None:
         passed_ms = this_frame_ticks - prev_frame_ticks
         prev_frame_ticks = this_frame_ticks
@@ -652,54 +707,111 @@ def draw_frame(screen):
             win_size[0] != new_win_size[0] or
             win_size[1] != new_win_size[1]):
         win_size = screen.get_size()
-        scale = None
-        scalable_surf = None
+        block_scale_horz = None
+        #scalable_surf = None
         #print("Changed window size...")
         #print("win_size: " + str(win_size))
-        #print("scale: " + str(scale))
-    # an ideal scale will have about 12 meters for smallest dimension
+        #print("block_scale_horz: " + str(block_scale_horz))
+    block_aspect = math.sqrt(2.0) / 2.0
+        # perspective for camera 45 degrees downward
+    ideal_min_m = 11
+    ideal_vert_m = (ideal_min_m/block_aspect)  # meters visible at 45
+    # An ideal scale will have about 11 meters for smallest dimension,
+    # --based on 16x16 tiles on "visible" area of 90s consoles: 256x176.
+    # With perspective (11/(sqrt(2)/2)) that would be ~ideal_m_h meters.
     short_px_count = win_size[1]
+    ideal_tile_h = win_size[1] / ideal_vert_m
+    ideal_tile_w = ideal_tile_h / block_aspect
     if win_size[0] < win_size[1]:
         short_px_count = win_size[0]
-    ideal_tile_h = short_px_count / 12
-    if scale is None:
+        ideal_tile_w = win_size[0] / ideal_min_m  # no perspective
+        ideal_tile_h = ideal_tile_w * block_aspect
+    block_scale_vert = None
+    #scaled_block_size = (game_tile_size[0] * block_scale_horz,
+    #                     game_tile_size[1] * block_scale_vert)
+    scaled_block_size = None
+    
+    for try_size in good_45deg_tile_sizes:
+        if try_size[0] >= ideal_tile_w:
+            scaled_block_size = try_size
+            break
+    if scaled_block_size is None:
+        push_text("Unknown nearest block size to ideal " +
+                  "tile size " + str((ideal_tile_w, ideal_tile_h)))
+        scaled_block_size = good_45deg_tile_sizes[-1]
+    
+    if block_scale_horz is None:
         if desired_scale is None:
-            scale = int(round(ideal_tile_h/world_tile_size[1]))
-            print("scale automatically chosen: " + str(scale))
+            block_scale_horz = (ideal_tile_w / game_tile_size[0])
+            block_scale_vert = (ideal_tile_h / game_tile_size[1])
+            print("block_scale_horz automatically chosen: " +
+                  str(block_scale_horz))
         else:
-            scale = desired_scale
-    scaled_size = win_size[0] / scale, win_size[1] / scale
-    if scalable_surf is None or scale != scalable_surf_scale:
-        scalable_surf = pg.Surface((int(scaled_size[0]),
-            int(scaled_size[1]))).convert()  # , flags=pg.SRCALPHA)
-        scalable_surf_scale = scale
-        temp_screen = scalable_surf
+            block_scale_horz = desired_scale
+            block_scale_vert = block_scale_horz * block_aspect
+    sprite_scale = None
+    try_scale = 64
+    while try_scale > 0:
+        if float(try_scale) - block_scale_horz < .15 + kEpsilon:
+            sprite_scale = float(try_scale)
+            break
+        try_scale = int(try_scale/2)
+    if sprite_scale is None:
+        sprite_scale = 1.0
+        push_text("Could not find big enough sprite scale for " +
+                  "block_scale_horz " + str(block_scale_horz))
+    sprite_f = float(game_tile_size[0])*sprite_scale
+    square_sprite_size = (int(round(sprite_f)), int(round(sprite_f)))
+    two_h_enable = False
+    if block_scale_horz < .1:
+        block_scale_horz = .1
+        block_scale_vert = block_scale_horz * block_aspect
+    else:
+        if game_tile_size[0] == game_tile_size[1]:
+            block_scale_vert = block_scale_horz * block_aspect
+            two_h_enable = True
+        else:
+            block_scale_vert = block_scale_horz
+    #scaled_size = win_size[0] / block_scale_horz, win_size[1] / block_scale_horz
+    #if scalable_surf is None or block_scale_horz != scalable_surf_scale:
+    #    scalable_surf = pg.Surface((int(scaled_size[0]),
+    #        int(scaled_size[1]))).convert()  # , flags=pg.SRCALPHA)
+    #    scalable_surf_scale = block_scale_horz
+    #    temp_screen = scalable_surf
+    temp_screen = screen
 
-    scalable_surf.fill((0, 0, 0))
+    #scalable_surf.fill((0, 0, 0))
+    screen.fill((0, 0, 0))
     #camera_loc = get_loc_at_px(camera['pos'])
-    camera_loc = get_loc_at_pos(camera['pos'])
-    scaled_block_size = (world_tile_size[0] * scale,
-                         world_tile_size[1] * scale)
-    block_counts = (math.ceil(scaled_size[0] / world_tile_size[0]),
-                    math.ceil(scaled_size[1] / world_tile_size[1]))
+    camera_loc = get_loc_at_pos(camera['pos'])    
+    # For determining draw range:
+    #block_counts = (math.ceil(scaled_size[0] / game_tile_size[0]),
+    #                math.ceil(scaled_size[1] / game_tile_size[1]))
+    block_counts = (math.ceil(win_size[0] / scaled_block_size[0]),
+                    math.ceil(win_size[1] / scaled_block_size[1]))
     block_half_counts = (int(block_counts[0] / 2) + 1,
                          int(block_counts[1] / 2) + 1)
     # reverse the y order so larger depth value is drawn below other
     # layers (end_loc's y is NEGATIVE on purpose due to draw order)
-    max_stack_preload_count = 5
-    extra_count = max_stack_preload_count * block_thickness_as_y
+    offscreen_stack_count = 8  # how high of a stack will be shown if
+                               # starts below bottom of screen
+    block_rise_as_y_px = scaled_block_size[1]
+    extra_count = offscreen_stack_count * block_rise_as_y_px
     start_loc = (camera_loc[0] - block_half_counts[0],
                  camera_loc[1] + block_half_counts[1])
     end_loc = (camera_loc[0] + block_half_counts[0],
                camera_loc[1] - block_half_counts[1] - extra_count)
     global screen_half
-    screen_half = scaled_size[0] / 2, scaled_size[1] / 2
-    w, h = world_tile_size
-    blocks = world["blocks"]
+    #screen_half = scaled_size[0] / 2, scaled_size[1] / 2
+    screen_half = win_size[0] / 2, win_size[0] / 2
+    w, h = scaled_block_size
+    
+    blocks = world['blocks']
     # for k, v in blocks.items():
     block_y = start_loc[1]
-    camera_px = (int(camera['pos'][0] * world_tile_size[0]),
-                 int(camera['pos'][2] * world_tile_size[1]))
+    camera_px = (int(camera['pos'][0] * scaled_block_size[0]),
+                 int(camera['pos'][2] * scaled_block_size[1]))
+    
     while block_y >= end_loc[1]:
         block_x = start_loc[0]
         while block_x <= end_loc[0]:
@@ -710,39 +822,47 @@ def draw_frame(screen):
                 sk = k  # spatial key
                 col, row = (int(cs[0]), int(cs[1]))
                 offset = 0
+                #rise_factor = .5
                 for i in range(len(v)):
+                    #rise_px = block_rise_as_y_px
                     node = v[i]
                     name = k + "[" + str(i) + "]"  # such as '0,0[1]'
-                    pos = (col*w, row*h)
+                    pos = (float(col)*w, float(row)*h)
                     anim = get_anim_from_node(node)
                     if anim is not None:
                         src_size = anim.get_surface().get_size()
                         x = ((pos[0]-camera_px[0]) + screen_half[0] -
-                             src_size[0]/2)
-                        # if x+w < 0 or x >= win_size[0]:
-                        #     continue
+                             scaled_block_size[0]/2)
                         y = (-1*(pos[1]-camera_px[1]) + screen_half[1] -
-                             src_size[1]/2)
-                        # if y+w < 0 or y >= win_size[0]:
-                        #     continue
-                        # if k=="me":
-                        #     print("me at " + str((x,y)))
-                        scalable_surf.blit(anim.get_surface(),
-                                           (x, y-offset))
+                             scaled_block_size[1]/2)
+                        screen.blit(pg.transform.scale(anim.get_surface(),
+                                                       scaled_block_size),
+                                    (x, y-offset))
                         animate = node.get('animate')
                         if animate is True:
                             anim.advance()
-                    offset += block_thickness_as_y
+                    offset += block_rise_as_y_px
             block_x += 1
         block_y -= 1
     global camera_target_unit_name
+    sk = None  # must get specific one under unit
+    if passed is not None:
+        frame_gravity = world['gravity'] * passed
     for k, unit in units.items():
             # TODO: check for python2 units.iteritems()
         material = materials[unit['what']]
         anim = material['tmp']['sprites'][unit['pose']]
         moved_vec3 = [0.0, 0.0, 0.0]
-        vec3 = unit['pos']
-        pos = vec3  # new pos after physics
+        posA = (unit['pos'][0], unit['pos'][1], unit['pos'][2])
+        posB = (posA[0], posA[1], posA[2])  # new pos after physics
+        ground_y = -10.0
+        skA = get_key_at_pos(posA)
+        stack = blocks.get(skA)
+        prev_stack = stack
+        
+        if stack is not None:
+            ground_y = float(len(stack))
+            #offset = len(stack) * block_rise_as_y_px
         if passed is not None:
             input_x = unit['tmp']['move_multipliers'][0]
             input_y = unit['tmp']['move_multipliers'][2]
@@ -783,16 +903,19 @@ def draw_frame(screen):
                 mode = 'walk'
                 if mode != prev_mode: anim.iter()  # reset to frame 0
             unit['mps_vec3'][0] = ls * math.cos(heading)
+            unit['mps_vec3'][1] -= frame_gravity
             unit['mps_vec3'][2] = ls * math.sin(heading)
 
-            moved_vec3 = (unit['mps_vec3'][0] * passed,
+            moved_vec3 = [unit['mps_vec3'][0] * passed,
                           unit['mps_vec3'][1] * passed,
-                          unit['mps_vec3'][2] * passed)
+                          unit['mps_vec3'][2] * passed]
             auto_pose(unit, mode=mode)
             pose = unit.get('pose')
             if visual_debug_enable:
                 if k == player_unit_name:
                     push_text(k+":")
+                    push_text("  unit['pos']: " +
+                              fmt_vec(unit['pos']))
                     push_text("  yaw_deg: " + str(unit['yaw_deg']))
                     push_text("  prev_heading: " +
                               str(math.degrees(prev_heading)))
@@ -826,42 +949,60 @@ def draw_frame(screen):
             # if unit['pose'] != 0: print("iter " + unit['pose'])
         # else:
             # if unit['pose'] != 0: print("hold " + unit['pose'])
-        screen_half = scaled_size[0] / 2, scaled_size[1] / 2
-        w, h = world_tile_size
-        # center_tile_tl_pos = win_size[0]/2-world_tile_size[0]/2,
-        #                      win_size[1]/2-world_tile_size[1]/2
+        # screen_half = scaled_size[0] / 2, scaled_size[1] / 2
+        screen_half = win_size[0] / 2, win_size[0] / 2
+        w, h = game_tile_size
+        # center_tile_tl_pos = win_size[0]/2-game_tile_size[0]/2,
+        #                      win_size[1]/2-game_tile_size[1]/2
         # center_tile_tl_pos = (0,0)
-        #unit['pos'][0] += moved_vec3[0]
-        #unit['pos'][1] + moved_vec3[2]
-        pos = (vec3[0] + moved_vec3[0],
-               vec3[1] + moved_vec3[1],
-               vec3[2] + moved_vec3[2])
-        unit['pos'] = pos
-        sk = get_key_at_pos(pos)
-        offset = -1
-        stack = blocks.get(sk)
-        if stack is not None:
-            offset = len(stack)
+        # unit['pos'][0] += moved_vec3[0]
+        # unit['pos'][1] + moved_vec3[2]
+        posB = [posA[0] + moved_vec3[0],
+                posA[1] + moved_vec3[1],
+                posA[2] + moved_vec3[2]]
+        skB = get_key_at_pos(posB)
+        # offset = -block_rise_as_y_px
+        #prev_agl = posA[1] - ground_y
+        agl = posB[1] - ground_y  # above ground level
+        if agl + 1.1 <= kEpsilon:  # can't climb that high, stop horz
+            unit['pos'] = (posA[0], posB[1], posA[2])
+        if agl > kEpsilon:  # keep falling
+            unit['pos'] = (posB[0], posB[1], posB[2])
+        else: # on ground so prevent effect of gravity
+            if unit['mps_vec3'][1] < 0.0:  # prevent effect of gravity
+                unit['mps_vec3'][1] = 0.0
+                unit['pos'] = (posB[0], posA[1], posB[2])
+            else:  # maintain upward velocity
+                unit['pos'] = (posB[0], posB[1], posB[2])
         src_size = anim.get_surface().get_size()
         # if x+w < 0 or x >= win_size[0]:
         #     continue
-        x, y = vec2_from_vec3_via_camera(pos,
-                                         (src_size[0],
-                                          src_size[1]*1.66),
-                                         camera_vec2=camera_px)
+        
+        this_size = src_size[0]*sprite_scale, src_size[1]*sprite_scale
+        x, y = vec2_from_vec3_via_camera(unit['pos'], camera_vec2=camera_px)
+        x -= this_size[0] / 2
+        rise_factor = .125
+        y -= this_size[1] - float(this_size[1]) * rise_factor
+            # imaginary "center" of feet should have 1/8 tile height
+            # space before bottom of tile (1/8 = .125)
         # if y+w < 0 or y >= win_size[0]:
         #     continue
         # if k=="me":
         #     print("me at " + str((x,y)))
-        scalable_surf.blit(anim.get_surface(), (x,y-offset))
+        # scalable_surf.blit(anim.get_surface(), (x,y-offset))
+        screen.blit(pg.transform.scale(anim.get_surface(),
+                                       square_sprite_size),
+                    (x,y))  # y-offset
         # surface = next(anim)
         target_size = (1, 1)
         if k == player_unit_name:
+            if visual_debug_enable:
+                push_text("  ground_y:" + str(ground_y))
+                push_text("  agl:" + str(agl))
             target = get_unit_crosshairs_vec3(unit)
-            x, y = vec2_from_vec3_via_camera(target, (3,3),
-                                             camera_vec2=camera_px)
+            x, y = vec2_from_vec3_via_camera(target, camera_vec2=camera_px)
             color = (200, 10, 0)
-            pg.draw.rect(scalable_surf,
+            pg.draw.rect(screen,  # scalable_surf,
                          color,
                          pg.Rect(x-int(target_size[0]/2),
                                  y-int(target_size[1]/2),
@@ -871,6 +1012,7 @@ def draw_frame(screen):
 
     if visual_debug_enable:
         push_text("FPS: " + fps_s)
+        push_text("block_scale_horz: " + str(block_scale_horz))
 
     if (popup_surf is None) or (popup_showing_text != popup_text):
         if popup_text is not None:
@@ -899,20 +1041,22 @@ def draw_frame(screen):
             if popup_sec <= 0:
                 popup_shadow_surf.set_alpha(popup_alpha)
                 popup_surf.set_alpha(popup_alpha)
-            scalable_surf.blit(popup_shadow_surf,
-                               (text_pos[0]+2,text_pos[1]+1))
-            scalable_surf.blit(popup_surf,
-                               (text_pos[0],text_pos[1]))
+            # scalable_surf.blit
+            screen.blit(popup_shadow_surf,
+                        (text_pos[0]+2,text_pos[1]+1))
+            # scalable_surf.blit
+            screen.blit(popup_surf,
+                        (text_pos[0],text_pos[1]))
             text_size = popup_surf.get_size()
             text_pos[1] += text_size[1]
             popup_alpha -= settings["popup_alpha_per_sec"] * passed
     global bindings
     q = bindings.get('draw_ui')
     for f in q:
-        f({'screen':scalable_surf})
-    screen.blit(pg.transform.scale(scalable_surf,
-                                   (int(win_size[0]),int(win_size[1]))),
-                (0,0))
+        f({'screen':screen})   # formerly scalable_surf
+    # screen.blit(pg.transform.scale(scalable_surf,
+    #                                (int(win_size[0]),int(win_size[1]))),
+    #             (0,0))
     show_stats_once()
     if camera_target_unit_name is not None:
             move_camera_to(camera_target_unit_name)
@@ -923,12 +1067,12 @@ def show_stats_once():
     if show_stats_enable:
         print()
         print("win_size: " + str(win_size))
-        print("scaled_size: " + str(scaled_size))
+        #print("scaled_size: " + str(scaled_size))
         print("scaled_block_size: " + str(scaled_block_size))
         print("block_half_counts: " + str(block_half_counts))
         print("start_loc: " + str(start_loc))
         print("end_loc: " + str(end_loc))
-        print("scale: " + str(scale))
+        print("block_scale_horz: " + str(block_scale_horz))
     show_stats_enable = False
 
 def draw_text_vec2(s, color, surf, vec2):
@@ -953,12 +1097,16 @@ def push_text(s, color=(255,255,255), screen=None):
     if screen is not None:
         temp_screen = screen
     if temp_screen is not None:
-        s_surf = default_font.render(s, settings['text_antialiasing'],
-                                     color)
-        text_size = s_surf.get_size()
-        temp_screen.blit(s_surf, (text_pos[0],text_pos[1]))
-        text_pos[1] += text_size[1]
-
+        
+        try:
+            s_surf = default_font.render(s, settings['text_antialiasing'],
+                                         color)
+            text_size = s_surf.get_size()
+            temp_screen.blit(s_surf, (text_pos[0],text_pos[1]))
+            text_pos[1] += text_size[1]
+        except AttributeError:  #pygame zero (mobile)
+            temp_screen.draw.text("Outlined text", text_pos, owidth=1.5, ocolor=(255,255,0), color=(0,0,0), fontsize=14)
+            text_pos[1] += 18
 # series: if more than one frame, you can pass pre-generated sprite loop 
 # order: (requires len(series)>1) indices of frames specifying order
 # starting at 1 
@@ -1022,8 +1170,8 @@ def _load_sprite(what, cells, order=None, gettable=True,
     if surf is None:
         surf = pg.image.load(path) #.convert_alpha()
         file_surfaces[path] = surf
-    #w, h = surf.get_size()
-    #return results
+    # w, h = surf.get_size()
+    # return results
 
 # gettable allows player to get material
 # path: if None, then uses last loaded tileset
@@ -1032,7 +1180,7 @@ def load_material(what, column, row, gettable=True,
                  native=True, overlayable=False,
                  biome="default", count=1, order=None,
                  next_offset="right", loop=True, default_animate=None):
-    global world_tile_size
+    global game_tile_size
     if default_animate is None:
         if count > 1:
             default_animate = True
@@ -1079,9 +1227,9 @@ def load_material(what, column, row, gettable=True,
             materials[what]['path'] = path
     else:
         materials[what]['path'] = path
-    if world_tile_size is None:
-        world_tile_size = tilesets[path]['tile_size']
-        print("world_tile_size from material: " + str(world_tile_size))
+    if game_tile_size is None:
+        game_tile_size = tilesets[path]['tile_size']
+        print("game_tile_size from material: " + str(game_tile_size))
 
 # same as load_material but with different defaults
 def load_character(what, column, row, gettable=False,
@@ -1131,7 +1279,8 @@ def _place_unit(what, name, pos, pose=None, animate=True):
     units[name]['pose'] = pose
     units[name]['animate'] = animate
     units[name]['yaw_deg'] = -90.0
-    units[name]['mps_vec3'] = [0.0, 0.0, 0.0]
+    units[name]['mps_vec3'] = [0.0, 5.0, 0.0]
+    #TODO: place on ground (being below ground is a problem)
     units[name]['tmp']['move_multipliers'] = [0.0, 0.0, 0.0]
 
 def stop_unit(name):
@@ -1162,6 +1311,7 @@ def place_character(what, name, pos):
 def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
                  margin_r=0, margin_b=0, spacing_x=0, spacing_y=0):
     global last_loaded_path
+    global tilesets
     last_loaded_path = path
     surf = file_surfaces.get(path)
     if surf is None:
@@ -1184,8 +1334,8 @@ def get_loc_at_pos(pos):
     return world_loc
 
 def get_loc_at_px(vec2):
-    world_loc = (int(vec2[0] / world_tile_size[0]),
-                 int(vec2[1] / world_tile_size[1]))
+    world_loc = (int(vec2[0] / game_tile_size[0]),
+                 int(vec2[1] / game_tile_size[1]))
     return world_loc
 
 def get_gobs_at(loc):
@@ -1199,11 +1349,11 @@ def _place_world():
     if last_loaded_path is None:
         raise ValueError("missing last_loaded_path (must load_tileset"
                          "before load_world can call graphics methods)")
-    #blocks = world["blocks"]
+    #blocks = world['blocks']
     #for k, block in blocks.items():
     #    cs = k.split(",")  # key is a location string
     #    col, row = (int(cs[0]), int(cs[1]))
-    #    w, h = world_tile_size  # tilesets[path]['tile_size']
+    #    w, h = game_tile_size  # tilesets[path]['tile_size']
     #    for i in range(len(block)):
     #        node = block[i]
     #        name = k + "[" + str(i) + "]"
@@ -1225,7 +1375,7 @@ def get_blocks(key):
 def pop_node(key):
     sk = key  # spatial key
     result = None
-    blocks = world["blocks"]
+    blocks = world['blocks']
     if sk in blocks:
         if len(blocks[sk]) > 1:
             result = blocks[sk][-1]
@@ -1252,18 +1402,22 @@ def save_world():
 def load_world(name, generate=False):
     global world
     global last_loaded_world_name
+    global settings
     last_loaded_world_name = name
     world = None
     path = name + ".json"
     print("world path: " + path)
     if os.path.isfile(path):
         with open(path, "r") as ins:
-            world = json.load(ins)    
+            world = json.load(ins)
     if world is not None:
+        if 'gravity' not in world:
+            world['gravity'] = settings['default_world_gravity']
         return
     world = {}
-    world["blocks"] = {}
-    blocks = world["blocks"]
+    world['gravity'] = settings['default_world_gravity']
+    world['blocks'] = {}
+    blocks = world['blocks']
     #TODO: if generate:
     bedrock_what = None
     material_all = list(materials)
@@ -1303,6 +1457,11 @@ def load_world(name, generate=False):
     _place_world()
 
 if __name__ == "__main__":
+    print()
+    print("SHOWING INTERNALS")
+    print("good_45deg_tile_sizes: " + str(good_45deg_tile_sizes))
+    print()
     print("Instead of running this file, use it in your program like:\n"
           "from mgep import *\n"
           "#see also example-*.pyw")
+    print()

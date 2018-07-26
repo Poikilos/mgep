@@ -81,6 +81,9 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
   * _accel: meters per second squared
   * pose is a string referring to an animation, structured as `mode+'.'+cardinal` where cardinal is a direction ssuch as `'walk.N'`
   * heading is direction pointing, course is direction moving
+  * agl is above ground level
+  * horz is horizontal
+  * vert is vertical
 * optional unit values (to override defaults):
   * `'max_land_mps'`: maximum meters per second land speed
   * `'max_land_accel'`: maximum meters per second squared land speed

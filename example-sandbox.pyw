@@ -44,7 +44,6 @@ screen = pg.display.set_mode((1000, 700), pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZ
 clock = pg.time.Clock()
 set_visual_debug(True)
 done = False
-
 #load_tileset("tiny-16-basic/basictiles.png", 8, 15)
 #add_material("grass", 9, 1)
 #add_material("grass", 9, 2)
@@ -144,6 +143,9 @@ while not done:
                     blocks.append(item)
                 else:
                     show_popup("You don't have any items")
+            elif event.key == pg.K_SPACE:
+                if not unit_jump(player_name, 4):
+                    show_popup("cannot jump while airborne")
             elif event.key == pg.K_ESCAPE:
                 done = True
             elif event.key == pg.K_F3:
