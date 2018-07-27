@@ -711,12 +711,12 @@ def unit_jump(name, vel_y, vel_x=None, vel_z=None,
                                     mps[1] + vel_y,
                                     mps[2] + vel_z]
                 return True
-            else:
-                print("cannot jump: ground is not present (" +
-                      str(ground_y) + ")")
-        else:
-            print("cannot jump: ground " + str(ground_y) + " unit " +
-                  str(unit['pos'][1]))
+            # else:
+                # print("cannot jump: ground is not present (" +
+                      # str(ground_y) + ")")
+        # else:
+            # print("cannot jump: ground " + str(ground_y) + " unit " +
+                  # str(unit['pos'][1]))
     return False
 
 def draw_frame(screen):
@@ -746,7 +746,7 @@ def draw_frame(screen):
     global total_ticks
     global frame_count
     global good_45deg_tile_sizes
-    places = 6
+    places = 2
     passed = 0.0  # seconds
     passed_ms = 0
     this_frame_ticks = pg.time.get_ticks() 
@@ -771,6 +771,10 @@ def draw_frame(screen):
     else:
         prev_frame_ticks = this_frame_ticks
     
+    if visual_debug_enable:
+        push_text("block_scale_horz: " + str(block_scale_horz))
+        push_text("FPS: " + fps_s)
+
     if default_font is None:
         default_font = pg.font.SysFont(settings['sys_font_name'],
                                        int(settings['sys_font_size']))
@@ -961,15 +965,16 @@ def draw_frame(screen):
                 ground_yA = nothing_y
         aglA = posA[1] - ground_yA
         if debug_unit:
-            push_text("frame_gravity: " + fmt_f(frame_gravity, places=places))
+            # push_text("frame_gravity: " + fmt_f(frame_gravity, places=places))
             push_text(k+":")
-            push_text("  before.ground_y:" + str(ground_yA))
-            push_text("  before.posA[1]:" + str(posA[1]))
-            push_text("  before.agl:" + str(aglA))
+            # push_text("  before.ground_y:" + str(ground_yA))
+            # push_text("  before.posA[1]:" + str(posA[1]))
+            # push_text("  before.agl:" + str(aglA))
 
         on_ground = False
         if posA[1] - ground_yA < kEpsilon:
             on_ground = True
+        unit['tmp']['on_ground'] = on_ground
 
         if passed is not None:
             input_x = unit['tmp']['move_multipliers'][0]
@@ -1019,10 +1024,11 @@ def draw_frame(screen):
             moved_vec3 = [unit['mps_vec3'][0] * passed,
                           unit['mps_vec3'][1] * passed,
                           unit['mps_vec3'][2] * passed]
-            auto_pose(unit, mode=mode)
+            if on_ground:
+                auto_pose(unit, mode=mode)
             pose = unit.get('pose')
             if debug_unit:
-                push_text("  before.ground_y: " + str(ground_yA))
+                # push_text("  before.ground_y: " + str(ground_yA))
                 push_text("  unit['pos']: " +
                           fmt_vec(unit['pos'], places=places))
                 push_text("  yaw_deg: " + str(unit['yaw_deg']))
@@ -1039,21 +1045,25 @@ def draw_frame(screen):
                           fmt_vec((ls_x, 0.0, ls_y)))
                 push_text("  desired_accel: " +
                           fmt_f(desired_accel))
-                push_text("  unit['mps_vec3']: " +
-                          fmt_vec(unit['mps_vec3'], places=places))
-                push_text("  moved_vec3: " + fmt_vec(moved_vec3, places=places))
+                # push_text("  unit['mps_vec3']: " +
+                          # fmt_vec(unit['mps_vec3'], places=places))
+                # push_text("  moved_vec3: " +
+                          # fmt_vec(moved_vec3, places=places))
 
             # NOTE: atan2 takes y,x and returns radians
             dist_per_frame = 0.5  # TODO: make setting and override
-            if unit['animate']:
-                msa = unit['tmp'].get('moved_since_advance')
-                if msa is None:
-                    msa = 0.0
-                msa += ls * passed
-                if msa >= dist_per_frame:
-                    msa -= dist_per_frame
-                    anim.advance()
-                unit['tmp']['moved_since_advance'] = msa
+            if on_ground or \
+               (unit['tmp']['move_multipliers'][0] != 0.0) or \
+               (unit['tmp']['move_multipliers'][2] != 0.0):
+                if unit['animate']:
+                    msa = unit['tmp'].get('moved_since_advance')
+                    if msa is None:
+                        msa = 0.0
+                    msa += ls * passed
+                    if msa >= dist_per_frame:
+                        msa -= dist_per_frame
+                        anim.advance()
+                    unit['tmp']['moved_since_advance'] = msa
 
             # if unit['pose'] != 0: print("iter " + unit['pose'])
         # else:
@@ -1081,31 +1091,19 @@ def draw_frame(screen):
         #agl: # above ground level
         
         aglB = posB[1] - ground_yB
-        if debug_unit:
-            push_text("  processing.ground_y:" + str(ground_yB))
-            push_text("  processing.posB[1]:" + str(posB[1]))
-            push_text("  processing.agl:" + str(aglB))
+        # if debug_unit:
+            # push_text("  processing.ground_y:" + str(ground_yB))
+            # push_text("  processing.posB[1]:" + str(posB[1]))
+            # push_text("  processing.agl:" + str(aglB))
         limited_horz = False
-        #if aglB + unit['auto_climb_max'] <= kEpsilon:  # hit side, stop horz
-        #if (ground_yB - ground_yA > kEpsilon)
-        
-        # if (posB[1] + unit['auto_climb_max'] < ground_yB):
-            # msg = "hit side (from " + str(posB[1]) + " to " + str(ground_yB)
-            # if debug_unit:
-                # print(msg)
-                # push_text(msg)
-            # unit['mps_vec3'][0] = 0.0
-            # unit['mps_vec3'][2] = 0.0
-            # posB[0] = posA[0]
-            # posB[2] = posA[2]
-            # ground_yB = ground_yA
-            # aglB = aglA
-            # limited_horz = True
+
         push_msg = ""
 
         if ground_yB - posB[1] > unit['auto_climb_max']:
-            push_msg += " -- hit side " + str(ground_yB) + " > " + str(posB[1])
-            print("hit side")
+            push_msg += (" -- hit side since" +
+                         fmt_f(ground_yB - posB[1]) +
+                         "  >  " + fmt_f(unit['auto_climb_max']) +
+                         " auto_climb_max")
             unit['mps_vec3'][0] = 0.0
             unit['mps_vec3'][2] = 0.0
             posB[0] = posA[0]
@@ -1120,7 +1118,8 @@ def draw_frame(screen):
             unit['tmp']['at_edge'] = False
         
         if posB[1] < ground_yB:
-            push_msg = "pushed up from " + str(posB[1]) + " to " + str(ground_yB)
+            # push_msg = "pushed up"
+                       # fmt_f(posB[1]) + " to " + fmt_f(ground_yB)
             aglB = 0.0
             posB[1] = ground_yB
             moved_vec3[1] = posB[1] - posA[1]
@@ -1145,7 +1144,8 @@ def draw_frame(screen):
                 ground_yB = float(len(stackB))
             else:
                 ground_yB = nothing_y
-            
+        push_text("  unit['mps_vec3']: " +
+                  fmt_vec(unit['mps_vec3'], places=places))
         unit['tmp']['prev_ground_yB'] = ground_yB
         src_size = anim.get_surface().get_size()
         # if x+w < 0 or x >= win_size[0]:
@@ -1170,11 +1170,11 @@ def draw_frame(screen):
         target_size = (1, 1)
         if k == player_unit_name:
             if visual_debug_enable:
-                push_text("  after.ground_y:" + str(ground_yB))
-                push_text("  after.agl:" + str(aglB))
-                push_text("  after.unit['mps_vec3']:" + fmt_vec(unit['mps_vec3'], places=places))
-                push_text("  after.unit['pos']:" + fmt_vec(unit['pos'], places=places))
-                push_text("  after.moved_vec3:" + fmt_vec(moved_vec3, places=places))
+                # push_text("  after.ground_y:" + str(ground_yB))
+                # push_text("  after.agl:" + str(aglB))
+                # push_text("  after.unit['mps_vec3']:" + fmt_vec(unit['mps_vec3'], places=places))
+                # push_text("  after.unit['pos']:" + fmt_vec(unit['pos'], places=places))
+                push_text("  moved_vec3:" + fmt_vec(moved_vec3, places=places))
             target = get_unit_crosshairs_vec3(unit)
             x, y = vec2_from_vec3_via_camera(target, camera_vec2=camera_px)
             color = (200, 10, 0)
@@ -1185,11 +1185,7 @@ def draw_frame(screen):
                                  target_size[0],
                                  target_size[1])
                         )
-
-    if visual_debug_enable:
-        push_text("FPS: " + fps_s)
-        push_text("block_scale_horz: " + str(block_scale_horz))
-
+    
     if (popup_surf is None) or (popup_showing_text != popup_text):
         if popup_text is not None:
             popup_surf = default_font.render(
@@ -1479,17 +1475,19 @@ def stop_unit(name):
     material = materials[unit['what']]
     # direction = get_cardinal_deg(unit.get('yaw_deg'))
     unit['tmp']['move_multipliers'] = [0.0, 0.0, 0.0]
-    mode = 'idle'
-    auto_pose(unit, mode=mode)
-    pose = unit.get('pose')
-    if mode + "." not in pose:
-        pose = 'idle'
-    # if direction is not None:
-        # pose = 'idle.' + direction
-    if pose in material['tmp']['sprites']:
-        unit['pose'] = pose
-    else:
-        unit['animate'] = False
+    on_ground = unit['tmp'].get('on_ground')
+    if on_ground is True:
+        mode = 'idle'
+        auto_pose(unit, mode=mode)
+        pose = unit.get('pose')
+        if mode + "." not in pose:
+            pose = 'idle'
+        # if direction is not None:
+            # pose = 'idle.' + direction
+        if pose in material['tmp']['sprites']:
+            unit['pose'] = pose
+        else:
+            unit['animate'] = False
 
 # creates a new unit based on 'what' graphic, with a unique name
 # pos: the (x,y) cartesian (y up) position of the character
