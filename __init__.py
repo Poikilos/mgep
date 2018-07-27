@@ -62,6 +62,7 @@ popup_alpha = 0
 visual_debug_enable = False
 bindings = {}
 bindings['draw_ui'] = []
+nothing_y = -10.0
 
 # when: an event name such as 'draw_ui' 
 # f: a function formatted like `def on_draw_ui(e)` so e can be filled
@@ -75,9 +76,13 @@ def bind(when, f):
         print('ERROR: no "' + str(when) + '" event exists. Try ' +
               str(list(bindings)))
 
-def get_tile_size():
+def _get_tile_src_size():
     global game_tile_size
     return game_tile_size
+
+def get_tile_size():
+    global scaled_block_size
+    return scaled_block_size
 
 def equal_str_content(master, other):
     if master is not None and other is not None:
@@ -197,10 +202,14 @@ start_loc = None
 end_loc = None
 #endregion reinitialized each frame
 
-def fmt_f(f, fmt="{0:.1f}", places=1):
+def fmt_f(f, fmt=None, places=1):
+    if fmt is None:
+        fmt = "{0:." + str(places) + "f}"
     return fmt.format(round(f,places))
 
-def fmt_vec(vec, fmt="{0:.1f}", places=1):
+def fmt_vec(vec, fmt=None, places=1):
+    if fmt is None:
+        fmt = "{0:." + str(places) + "f}"
     ret = ""  # "<vec" + str(len(vec)) + ">"
     sep = ""
     for f in vec:
@@ -265,6 +274,8 @@ def get_key_at_pos(pos):
 def get_unit_crosshairs_vec3(unit):
     global game_tile_size
     pos = [ unit['pos'][0], unit['pos'][1], unit['pos'][2] ]
+    if visual_debug_enable:
+        push_text("  crosshairs: " + fmt_vec(pos))
     # offsets = [0,0]
     offsets = ( math.cos(math.radians(unit['yaw_deg'])), 
                 math.sin(math.radians(unit['yaw_deg'])) )
@@ -472,6 +483,13 @@ class SpriteStripAnim(object):
         if order is not None:
             self._go_to_order()
         self.image = self.images[self.i]
+        
+        self.lit_surf = pg.Surface(self.image.get_size(), flags=pg.SRCALPHA)
+        self.black_surf = pg.Surface(self.image.get_size(), flags=pg.SRCALPHA)
+        self.lowlight = .75
+        self._lowlit = None
+        self._lowlit_i = None
+
         self.loop = loop
         
         self.delay_count = int(delay_count)
@@ -487,7 +505,35 @@ class SpriteStripAnim(object):
         if self.order is not None: self._go_to_order()
         self.f = self.delay_count
         return self
-
+        
+    def get_lit_surface(self):
+        if self.lowlight is not None:
+            if self.lowlight < 0.0: self.lowlight = 0.0
+            elif self.lowlight > 1.0: self.lowlight = 1.0
+            darkness = 1.0 - self.lowlight
+            if (self._lowlit is None) or \
+               (self._lowlit != self.lowlight) or \
+               (self._lowlit_i != self.i):
+                self.black_surf.fill((darkness*255,
+                                      darkness*255,
+                                      darkness*255, 0))
+                self.lit_surf.fill((0,0,0,0))
+                self.lit_surf.blit(self.image, (0, 0))
+                self.lit_surf.blit(self.black_surf, (0, 0),
+                                   special_flags=pg.BLEND_RGBA_SUB)
+                                    # this blend is slow, but seems
+                                    # necessary so alpha doesn't get
+                                    # overwritten.
+                # See also https://www.reddit.com/r/pygame/comments/
+                # 4b8mnz/is_it_possible_to_make_an_image_darker/
+                self._lowlit = self.lowlight
+                self._lowlit_i = self.i
+            return self.lit_surf
+        else:
+            return self.image
+        
+        return self.lit_surf
+        
     def get_surface(self):
         # return self.images[self.i]
         return self.image
@@ -591,6 +637,7 @@ def get_anim_from_node(node):
         print("ERROR in get_anim_from_node: " + str(node) +
               " is " + str(type(node)) + " not node dict " +
               " (maybe you sent a node key instead).")
+        return None
     pose = node.get('pose')
     if pose is None:
         # print("WARNING: no pose for " + node['what'] + " at " + k)
@@ -620,21 +667,39 @@ def get_anim_from_node(node):
             print("There are no graphics for node '" + name + "'")
             shown_node_graphics_warnings[name] = True
     return anim
-    
-def unit_jump(name, vel_y, vel_x=None, vel_z=None, max_y=kEpsilon):
+
+# Returns True, False, or None (no ground directly under)
+# for the unit with the given name.
+def unit_is_on_ground(name, double_jump_y=kEpsilon):
     blocks = world['blocks']
     unit = units.get(name)
     if unit is not None:
         sk = get_key_at_pos(unit['pos'])
-        ground_y = -10.0
+        ground_y = nothing_y
         stack = blocks.get(sk)
         if stack is not None:
             ground_y = float(len(stack))
             #offset = len(stack) * block_rise_as_y_px
+            if unit['pos'][1] - ground_y <= double_jump_y:
+                return True
+            else:
+                return False
+    return None
         
-        if unit['pos'][1] - ground_y <= max_y:
-            if (ground_y >= 0.0) or (max_y > kEpsilon):
-                    # either on ground or allow double jump
+def unit_jump(name, vel_y, vel_x=None, vel_z=None,
+        double_jump_y=kEpsilon):
+    blocks = world['blocks']
+    unit = units.get(name)
+    if unit is not None:
+        sk = get_key_at_pos(unit['pos'])
+        ground_y = nothing_y
+        stack = blocks.get(sk)
+        if stack is not None:
+            ground_y = float(len(stack))
+            # offset = len(stack) * block_rise_as_y_px
+        if unit['pos'][1] - ground_y <= double_jump_y:
+            if (ground_y >= nothing_y) or (double_jump_y > kEpsilon):
+                    # on ground, or allow double jump above nothing
                 mps = unit['mps_vec3']
                 if vel_y is None:
                     vel_y = 0.0
@@ -642,8 +707,16 @@ def unit_jump(name, vel_y, vel_x=None, vel_z=None, max_y=kEpsilon):
                     vel_x = 0.0
                 if vel_z is None:
                     vel_z = 0.0
-                unit['mps_vec3'] = [mps[0] + vel_x, mps[1] + vel_y, mps[2] + vel_z]
+                unit['mps_vec3'] = [mps[0] + vel_x,
+                                    mps[1] + vel_y,
+                                    mps[2] + vel_z]
                 return True
+            else:
+                print("cannot jump: ground is not present (" +
+                      str(ground_y) + ")")
+        else:
+            print("cannot jump: ground " + str(ground_y) + " unit " +
+                  str(unit['pos'][1]))
     return False
 
 def draw_frame(screen):
@@ -673,6 +746,7 @@ def draw_frame(screen):
     global total_ticks
     global frame_count
     global good_45deg_tile_sizes
+    places = 6
     passed = 0.0  # seconds
     passed_ms = 0
     this_frame_ticks = pg.time.get_ticks() 
@@ -821,27 +895,45 @@ def draw_frame(screen):
                 cs = k.split(",")
                 sk = k  # spatial key
                 col, row = (int(cs[0]), int(cs[1]))
-                offset = 0
+                #offset = 0
                 #rise_factor = .5
+                rise = 0.0
+                side = None
                 for i in range(len(v)):
                     #rise_px = block_rise_as_y_px
                     node = v[i]
                     name = k + "[" + str(i) + "]"  # such as '0,0[1]'
-                    pos = (float(col)*w, float(row)*h)
+                    pos = (float(col), rise, float(row))
                     anim = get_anim_from_node(node)
                     if anim is not None:
-                        src_size = anim.get_surface().get_size()
-                        x = ((pos[0]-camera_px[0]) + screen_half[0] -
-                             scaled_block_size[0]/2)
-                        y = (-1*(pos[1]-camera_px[1]) + screen_half[1] -
-                             scaled_block_size[1]/2)
-                        screen.blit(pg.transform.scale(anim.get_surface(),
+                        top = anim.get_surface()
+                        src_size = top.get_size()
+                        if rise > 0.0:
+                            if rise >= 2.0:
+                                anim.lowlight = .9
+                            else:
+                                anim.lowlight = .75
+                            side = anim.get_lit_surface()
+                        block_vec2 = vec2_from_vec3_via_camera(pos, camera_vec2=camera_px)
+                        x, y = block_vec2
+                        x -= scaled_block_size[0]/2
+                        y -= scaled_block_size[1]/2
+                        # x = ((pos[0]-camera_px[0]) + screen_half[0] -
+                        #      scaled_block_size[0]/2)
+                        # y = (-1*(pos[2]-camera_px[1]) + screen_half[1] -
+                        #      scaled_block_size[1]/2)
+                        if side is not None:
+                            screen.blit(pg.transform.scale(side,
+                                                           scaled_block_size),
+                                        (x, y))  # y-offset
+                        screen.blit(pg.transform.scale(top,
                                                        scaled_block_size),
-                                    (x, y-offset))
+                                    (x, y-block_rise_as_y_px))  # y-offset
                         animate = node.get('animate')
                         if animate is True:
                             anim.advance()
-                    offset += block_rise_as_y_px
+                    #offset += block_rise_as_y_px
+                    rise += 1.0
             block_x += 1
         block_y -= 1
     global camera_target_unit_name
@@ -850,19 +942,35 @@ def draw_frame(screen):
         frame_gravity = world['gravity'] * passed
     for k, unit in units.items():
             # TODO: check for python2 units.iteritems()
+        debug_unit = visual_debug_enable and (k == player_unit_name)
         material = materials[unit['what']]
         anim = material['tmp']['sprites'][unit['pose']]
         moved_vec3 = [0.0, 0.0, 0.0]
         posA = (unit['pos'][0], unit['pos'][1], unit['pos'][2])
         posB = (posA[0], posA[1], posA[2])  # new pos after physics
-        ground_y = -10.0
         skA = get_key_at_pos(posA)
-        stack = blocks.get(skA)
-        prev_stack = stack
+        skB = get_key_at_pos(posB)
+        ground_yA = None
+        #ground_yA = unit['tmp'].get('prev_ground_yB')
         
-        if stack is not None:
-            ground_y = float(len(stack))
-            #offset = len(stack) * block_rise_as_y_px
+        if ground_yA is None:
+            stackA = blocks.get(skA)
+            if stackA is not None:
+                ground_yA = float(len(stackA))
+            else:
+                ground_yA = nothing_y
+        aglA = posA[1] - ground_yA
+        if debug_unit:
+            push_text("frame_gravity: " + fmt_f(frame_gravity, places=places))
+            push_text(k+":")
+            push_text("  before.ground_y:" + str(ground_yA))
+            push_text("  before.posA[1]:" + str(posA[1]))
+            push_text("  before.agl:" + str(aglA))
+
+        on_ground = False
+        if posA[1] - ground_yA < kEpsilon:
+            on_ground = True
+
         if passed is not None:
             input_x = unit['tmp']['move_multipliers'][0]
             input_y = unit['tmp']['move_multipliers'][2]
@@ -870,7 +978,8 @@ def draw_frame(screen):
             mls = unit.get('max_land_mps', settings['human_run_mps'])
             desired_multiplier = max(abs(input_x), abs(input_y))
             if desired_multiplier > 1.0:
-                push_text("WARNING: desired_multiplier is " +
+                if debug_unit:
+                    print("WARNING: desired_multiplier is " +
                           str(desired_multiplier) + " (should be <=1)")
                 desired_multiplier = 1.0
             mla = unit.get('max_land_accel',
@@ -902,37 +1011,37 @@ def draw_frame(screen):
                 unit['yaw_deg'] = math.degrees(heading)
                 mode = 'walk'
                 if mode != prev_mode: anim.iter()  # reset to frame 0
-            unit['mps_vec3'][0] = ls * math.cos(heading)
+            if unit['move_in_air'] or on_ground or (unit['tmp'].get('at_edge') is True):
+                unit['mps_vec3'][0] = ls * math.cos(heading)
+                unit['mps_vec3'][2] = ls * math.sin(heading)
             unit['mps_vec3'][1] -= frame_gravity
-            unit['mps_vec3'][2] = ls * math.sin(heading)
 
             moved_vec3 = [unit['mps_vec3'][0] * passed,
                           unit['mps_vec3'][1] * passed,
                           unit['mps_vec3'][2] * passed]
             auto_pose(unit, mode=mode)
             pose = unit.get('pose')
-            if visual_debug_enable:
-                if k == player_unit_name:
-                    push_text(k+":")
-                    push_text("  unit['pos']: " +
-                              fmt_vec(unit['pos']))
-                    push_text("  yaw_deg: " + str(unit['yaw_deg']))
-                    push_text("  prev_heading: " +
-                              str(math.degrees(prev_heading)))
-                    push_text("  heading: " + str(math.degrees(heading)))
-                    push_text("  pose: " + str(pose))
-                    push_text("  max_land_mps: " + fmt_f(mls))
-                    push_text("  unit['tmp']['move_multipliers']: " +
-                              fmt_vec(unit['tmp']['move_multipliers']))
-                    push_text("  dest_heading: " +
-                              fmt_f(math.degrees(dest_heading)))
-                    push_text("  speed_vec3: " +
-                              fmt_vec((ls_x, 0.0, ls_y)))
-                    push_text("  desired_accel: " +
-                              fmt_f(desired_accel))
-                    push_text("  unit['mps_vec3']: " +
-                              fmt_vec(unit['mps_vec3']))
-                    push_text("  moved_vec3: " + fmt_vec(moved_vec3))
+            if debug_unit:
+                push_text("  before.ground_y: " + str(ground_yA))
+                push_text("  unit['pos']: " +
+                          fmt_vec(unit['pos'], places=places))
+                push_text("  yaw_deg: " + str(unit['yaw_deg']))
+                push_text("  prev_heading: " +
+                          str(math.degrees(prev_heading)))
+                push_text("  heading: " + str(math.degrees(heading)))
+                push_text("  pose: " + str(pose))
+                push_text("  max_land_mps: " + fmt_f(mls))
+                push_text("  unit['tmp']['move_multipliers']: " +
+                          fmt_vec(unit['tmp']['move_multipliers']))
+                push_text("  dest_heading: " +
+                          fmt_f(math.degrees(dest_heading)))
+                push_text("  land_speed_vec3: " +
+                          fmt_vec((ls_x, 0.0, ls_y)))
+                push_text("  desired_accel: " +
+                          fmt_f(desired_accel))
+                push_text("  unit['mps_vec3']: " +
+                          fmt_vec(unit['mps_vec3'], places=places))
+                push_text("  moved_vec3: " + fmt_vec(moved_vec3, places=places))
 
             # NOTE: atan2 takes y,x and returns radians
             dist_per_frame = 0.5  # TODO: make setting and override
@@ -961,19 +1070,83 @@ def draw_frame(screen):
                 posA[1] + moved_vec3[1],
                 posA[2] + moved_vec3[2]]
         skB = get_key_at_pos(posB)
+        stackB = blocks.get(skB)
+        if stackB is not None:
+            ground_yB = float(len(stackB))
+        else:
+            ground_yB = nothing_y
+        
         # offset = -block_rise_as_y_px
-        #prev_agl = posA[1] - ground_y
-        agl = posB[1] - ground_y  # above ground level
-        if agl + 1.1 <= kEpsilon:  # can't climb that high, stop horz
-            unit['pos'] = (posA[0], posB[1], posA[2])
-        if agl > kEpsilon:  # keep falling
-            unit['pos'] = (posB[0], posB[1], posB[2])
-        else: # on ground so prevent effect of gravity
-            if unit['mps_vec3'][1] < 0.0:  # prevent effect of gravity
+        #prev_agl = posA[1] - ground_yA
+        #agl: # above ground level
+        
+        aglB = posB[1] - ground_yB
+        if debug_unit:
+            push_text("  processing.ground_y:" + str(ground_yB))
+            push_text("  processing.posB[1]:" + str(posB[1]))
+            push_text("  processing.agl:" + str(aglB))
+        limited_horz = False
+        #if aglB + unit['auto_climb_max'] <= kEpsilon:  # hit side, stop horz
+        #if (ground_yB - ground_yA > kEpsilon)
+        
+        # if (posB[1] + unit['auto_climb_max'] < ground_yB):
+            # msg = "hit side (from " + str(posB[1]) + " to " + str(ground_yB)
+            # if debug_unit:
+                # print(msg)
+                # push_text(msg)
+            # unit['mps_vec3'][0] = 0.0
+            # unit['mps_vec3'][2] = 0.0
+            # posB[0] = posA[0]
+            # posB[2] = posA[2]
+            # ground_yB = ground_yA
+            # aglB = aglA
+            # limited_horz = True
+        push_msg = ""
+
+        if ground_yB - posB[1] > unit['auto_climb_max']:
+            push_msg += " -- hit side " + str(ground_yB) + " > " + str(posB[1])
+            print("hit side")
+            unit['mps_vec3'][0] = 0.0
+            unit['mps_vec3'][2] = 0.0
+            posB[0] = posA[0]
+            posB[2] = posA[2]
+            moved_vec3[0] = 0.0
+            moved_vec3[2] = 0.0
+            aglB = aglA
+            ground_yB = ground_yA
+            limited_horz = True
+            unit['tmp']['at_edge'] = True
+        else:
+            unit['tmp']['at_edge'] = False
+        
+        if posB[1] < ground_yB:
+            push_msg = "pushed up from " + str(posB[1]) + " to " + str(ground_yB)
+            aglB = 0.0
+            posB[1] = ground_yB
+            moved_vec3[1] = posB[1] - posA[1]
+                
+        if aglB <= 0.0:
+            if debug_unit:
+                push_text("on ground " + push_msg)
+            if unit['mps_vec3'][1] < 0.0:
                 unit['mps_vec3'][1] = 0.0
-                unit['pos'] = (posB[0], posA[1], posB[2])
-            else:  # maintain upward velocity
-                unit['pos'] = (posB[0], posB[1], posB[2])
+            # else must be jumping or no vertical movement
+        else:
+            if debug_unit:
+                push_text("airborne")
+        
+        unit['pos'] = (posB[0], posB[1], posB[2])
+            
+        
+        if limited_horz:
+            skB = get_key_at_pos(unit['pos'])
+            stackB = blocks.get(skB)
+            if stackB is not None:
+                ground_yB = float(len(stackB))
+            else:
+                ground_yB = nothing_y
+            
+        unit['tmp']['prev_ground_yB'] = ground_yB
         src_size = anim.get_surface().get_size()
         # if x+w < 0 or x >= win_size[0]:
         #     continue
@@ -997,8 +1170,11 @@ def draw_frame(screen):
         target_size = (1, 1)
         if k == player_unit_name:
             if visual_debug_enable:
-                push_text("  ground_y:" + str(ground_y))
-                push_text("  agl:" + str(agl))
+                push_text("  after.ground_y:" + str(ground_yB))
+                push_text("  after.agl:" + str(aglB))
+                push_text("  after.unit['mps_vec3']:" + fmt_vec(unit['mps_vec3'], places=places))
+                push_text("  after.unit['pos']:" + fmt_vec(unit['pos'], places=places))
+                push_text("  after.moved_vec3:" + fmt_vec(moved_vec3, places=places))
             target = get_unit_crosshairs_vec3(unit)
             x, y = vec2_from_vec3_via_camera(target, camera_vec2=camera_px)
             color = (200, 10, 0)
@@ -1250,24 +1426,27 @@ def load_character(what, column, row, gettable=False,
 # [idle,step1,step3] (where idle frame is also step2)
 # and the rows are arranged based on Liberated Pixel Cup:
 # ['walk.N','walk.W','walk.S','walk.E']  # (North, West, South, East)
-def load_character_3x4(what, column, row):
-    load_character(what, column, row, pose='idle.N')
-    load_character(what, column, row+1, pose='idle.W')
-    load_character(what, column, row+2, pose='idle.S')
-    load_character(what, column, row+3, pose='idle.E')
-    load_character(what, column, row, order=[2,1,3,1], pose='walk.N')
-    load_character(what, column, row+1, order=[2,1,3,1], pose='walk.W')
-    load_character(what, column, row+2, order=[2,1,3,1], pose='walk.S')
-    load_character(what, column, row+3, order=[2,1,3,1], pose='walk.E')
+def load_character_3x4(what, column, row, order="NWSE"):
+    load_character(what, column, row, pose='idle.'+order[0])
+    load_character(what, column, row+1, pose='idle.'+order[1])
+    load_character(what, column, row+2, pose='idle.'+order[2])
+    load_character(what, column, row+3, pose='idle.'+order[3])
+    load_character(what, column, row, order=[2,1,3,1], pose='walk.'+order[0])
+    load_character(what, column, row+1, order=[2,1,3,1], pose='walk.'+order[1])
+    load_character(what, column, row+2, order=[2,1,3,1], pose='walk.'+order[2])
+    load_character(what, column, row+3, order=[2,1,3,1], pose='walk.'+order[3])
 
-def _place_unit(what, name, pos, pose=None, animate=True):
+overrides_help_enable = False
+
+def _place_unit(what, name, pos, pose=None, animate=True, overrides=None):
+    global overrides_help_enable
     if name in units:
         raise ValueError("There is already a unit named " + name)
     units[name] = {}
     units[name]['tmp'] = {}
     units[name]['what'] = what
     if len(pos) < 3:
-        units[name]['pos'] = float(pos[0]), 0.0, float(pos[1])
+        units[name]['pos'] = float(pos[0]), 10.0, float(pos[1])
     else:
         units[name]['pos'] = float(pos[0]), float(pos[1]), float(pos[2])
 
@@ -1279,9 +1458,21 @@ def _place_unit(what, name, pos, pose=None, animate=True):
     units[name]['pose'] = pose
     units[name]['animate'] = animate
     units[name]['yaw_deg'] = -90.0
-    units[name]['mps_vec3'] = [0.0, 5.0, 0.0]
+    units[name]['mps_vec3'] = [0.0, 0.0, 0.0]
     #TODO: place on ground (being below ground is a problem)
     units[name]['tmp']['move_multipliers'] = [0.0, 0.0, 0.0]
+    units[name]['auto_climb_max'] = 0.2  # usually low (catch edge)
+    units[name]['move_in_air'] = False
+    if overrides_help_enable:
+        print("Player 1 added.")
+        print("Overrides dict can contain the following keys: ")
+        for k,v in units[name].items():
+            print("  " + k + " #default:"+str(v)+"")
+        overrides_help_enable = False
+    if overrides is not None:
+        for k,v in overrides.items():
+            units[name][k] = v
+    
 
 def stop_unit(name):
     unit = units[name]
@@ -1302,7 +1493,7 @@ def stop_unit(name):
 
 # creates a new unit based on 'what' graphic, with a unique name
 # pos: the (x,y) cartesian (y up) position of the character
-def place_character(what, name, pos):
+def place_character(what, name, pos, overrides=None):
     _place_unit(what, name, pos)
     global player_unit_name
     if player_unit_name is None:
@@ -1408,12 +1599,16 @@ def load_world(name, generate=False):
     path = name + ".json"
     print("world path: " + path)
     if os.path.isfile(path):
+        print("  loading...")
         with open(path, "r") as ins:
             world = json.load(ins)
     if world is not None:
         if 'gravity' not in world:
             world['gravity'] = settings['default_world_gravity']
+        print("  loaded existing world.")
         return
+    else:
+        print("  generating...")
     world = {}
     world['gravity'] = settings['default_world_gravity']
     world['blocks'] = {}
@@ -1454,7 +1649,9 @@ def load_world(name, generate=False):
                     blocks[sk].append(node)
                 # else:
                     # print("generated None at " + sk)
+        print("  placing...")
     _place_world()
+    print("  finished (load_world).")
 
 if __name__ == "__main__":
     print()

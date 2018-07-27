@@ -84,9 +84,13 @@ def on_draw_ui(e):
     if surf is not None:
         size = surf.get_size()
         tile_size = get_tile_size()
-        preview_size = int(tile_size[0]/2), int(tile_size[1]/2)
-        outline_px = 1
-        margin_px = 1
+        preview_size = int(tile_size[0]), int(tile_size[1])
+        short_px = size[0]
+        if size[1] < short_px:
+            short_px = size[1]
+        outline_px = int(round(short_px / 300))
+        if outline_px < 1: outline_px = 1
+        margin_px = outline_px * 2
         square_size = (preview_size[0]+outline_px*2,
                        preview_size[1]+outline_px*2)
         x = margin_px + outline_px
@@ -123,13 +127,13 @@ while not done:
         if event.type == pg.QUIT:
             done = True
         elif event.type == pg.KEYDOWN:
-            if event.key == pg.K_RETURN:
+            if event.key == pg.K_DELETE:
                 items = get_unit_value(player_name, 'items')
                 a = get_selected_node_key()
                 item = pop_node(a)
                 if item is not None:
                     items.append(item)
-                    show_popup("You have " + str(get_whats(get_unit_value(player_name, 'items'))))
+                    # show_popup("You have " + str(get_whats(get_unit_value(player_name, 'items'))))
                 else:
                     show_popup("You can't dig any deeper")
             elif event.key == pg.K_INSERT:  # or event.key == pg.K_PAGEDOWN:
@@ -144,7 +148,7 @@ while not done:
                 else:
                     show_popup("You don't have any items")
             elif event.key == pg.K_SPACE:
-                if not unit_jump(player_name, 4):
+                if not unit_jump(player_name, 5):
                     show_popup("cannot jump while airborne")
             elif event.key == pg.K_ESCAPE:
                 done = True
