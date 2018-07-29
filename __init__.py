@@ -64,7 +64,7 @@ bindings = {}
 bindings['draw_ui'] = []
 nothing_y = -10.0
 
-# when: an event name such as 'draw_ui' 
+# when: an event name such as 'draw_ui'
 # f: a function formatted like `def on_draw_ui(e)` so e can be filled
 #    with a dict
 def bind(when, f):
@@ -150,7 +150,7 @@ if not equal_str_content(settings, got):
         json.dump(settings, outs)
 spare_keys = get_spare_keys(settings, got)
 if len(spare_keys) > 0:
-    print("got the following unknown settings from '" + 
+    print("got the following unknown settings from '" +
           os.path.abspath(settings_path) + ":")
     print("  " + str(spare_keys))
 
@@ -277,14 +277,14 @@ def get_unit_crosshairs_vec3(unit):
     if visual_debug_enable:
         push_text("  crosshairs: " + fmt_vec(pos))
     # offsets = [0,0]
-    offsets = ( math.cos(math.radians(unit['yaw_deg'])), 
+    offsets = ( math.cos(math.radians(unit['yaw_deg'])),
                 math.sin(math.radians(unit['yaw_deg'])) )
     target = pos[0]+offsets[0], pos[1], pos[2]+offsets[1]
     return target
 
 # camera_vec2 is not required. Provide if known for performance,
 # otherwise will be calculated using camera['pos']
-def vec2_from_vec3_via_camera(vec3, camera_vec2=None): #src_size, 
+def vec2_from_vec3_via_camera(vec3, camera_vec2=None): #src_size,
     global screen_half
     global scaled_block_size
     global block_rise_as_y_px
@@ -416,7 +416,7 @@ class SpriteSheet(object):
         except pg.error as message:
             print('Unable to load spritesheet image:', path)
             raise SystemExit(message)
-    
+
     # Load a specific image from a specific rectangle
     def image_at(self, rectangle, colorkey=None):
         "Loads image from x,y,x+offset,y+offset"
@@ -432,18 +432,18 @@ class SpriteSheet(object):
                 colorkey = image.get_at((0,0))
             image.set_colorkey(colorkey, pg.RLEACCEL)
         return image
-    
+
     # Load a whole bunch of images and return them as a list
     def images_at(self, rects, colorkey=None):
-        "Loads multiple images, supply a list of coordinates" 
+        "Loads multiple images, supply a list of coordinates"
         return [self.image_at(rect, colorkey) for rect in rects]
-    
+
     # Load a whole strip of images
     def load_strip(self, rect, image_count, colorkey=None):
         "Loads a strip of images and returns them as a list"
         tups = [(rect[0]+rect[2]*x, rect[1], rect[2], rect[3])
                 for x in range(image_count)]
-        return self.images_at(tups, colorkey) 
+        return self.images_at(tups, colorkey)
 
 
 # SpriteStripAnim class from https://www.pygame.org/wiki/Spritesheet
@@ -453,7 +453,7 @@ class SpriteSheet(object):
 # * added order (uses oi to go out of order); frame indices start at 1
 class SpriteStripAnim(object):
     """sprite strip animator
-    
+
     This class provides an iterator (iter() and next() methods), and a
     __add__() method for joining strips which comes in handy when a
     strip wraps to the next row.
@@ -463,13 +463,13 @@ class SpriteStripAnim(object):
     def __init__(self, path, rect, count, colorkey=None, loop=False,
                  delay_count=1, order=None):
         """construct a SpriteStripAnim
-        
+
         path, rect, count, and colorkey are the same arguments used
         by spritesheet.load_strip.
-        
+
         loop is a boolean that, when True, causes the next() method to
         loop. If False, the terminal case raises StopIteration.
-        
+
         delay_count is the count to return the same image
         before iterator advances to the next image.
         """
@@ -483,15 +483,15 @@ class SpriteStripAnim(object):
         if order is not None:
             self._go_to_order()
         self.image = self.images[self.i]
-        
-        self.lit_surf = pg.Surface(self.image.get_size(), flags=pg.SRCALPHA)
+
+        self.lowlit_surf = pg.Surface(self.image.get_size(), flags=pg.SRCALPHA)
         self.black_surf = pg.Surface(self.image.get_size(), flags=pg.SRCALPHA)
         self.lowlight = .75
         self._lowlit = None
         self._lowlit_i = None
 
         self.loop = loop
-        
+
         self.delay_count = int(delay_count)
         if self.delay_count<1:
             print("WARNING: setting delay_count to 1 " +
@@ -505,8 +505,8 @@ class SpriteStripAnim(object):
         if self.order is not None: self._go_to_order()
         self.f = self.delay_count
         return self
-        
-    def get_lit_surface(self):
+
+    def get_lowlit_surface(self):
         if self.lowlight is not None:
             if self.lowlight < 0.0: self.lowlight = 0.0
             elif self.lowlight > 1.0: self.lowlight = 1.0
@@ -517,9 +517,9 @@ class SpriteStripAnim(object):
                 self.black_surf.fill((darkness*255,
                                       darkness*255,
                                       darkness*255, 0))
-                self.lit_surf.fill((0,0,0,0))
-                self.lit_surf.blit(self.image, (0, 0))
-                self.lit_surf.blit(self.black_surf, (0, 0),
+                self.lowlit_surf.fill((0,0,0,0))
+                self.lowlit_surf.blit(self.image, (0, 0))
+                self.lowlit_surf.blit(self.black_surf, (0, 0),
                                    special_flags=pg.BLEND_RGBA_SUB)
                                     # this blend is slow, but seems
                                     # necessary so alpha doesn't get
@@ -528,12 +528,12 @@ class SpriteStripAnim(object):
                 # 4b8mnz/is_it_possible_to_make_an_image_darker/
                 self._lowlit = self.lowlight
                 self._lowlit_i = self.i
-            return self.lit_surf
+            return self.lowlit_surf
         else:
             return self.image
-        
-        return self.lit_surf
-        
+
+        return self.lowlit_surf
+
     def get_surface(self):
         # return self.images[self.i]
         return self.image
@@ -591,7 +591,7 @@ class SpriteStripAnim(object):
 
 shown_node_graphics_warnings = {}
 
-# Set node['yaw'] if pose ends in ".E" (0 degrees) or other cardinal 
+# Set node['yaw'] if pose ends in ".E" (0 degrees) or other cardinal
 # direction; otherwise if yaw not set already, and always_set is True,
 # set to default (-90.0 faces South)
 def set_yaw_from_pose(node, default=-90.0, always_set=False):
@@ -654,7 +654,7 @@ def get_anim_from_node(node):
             pose = None
             if direction is not None:
                 pose = "idle." + direction
-            if pose not in materials[node['what']]['tmp']['sprites']: 
+            if pose not in materials[node['what']]['tmp']['sprites']:
                 pose = random.choice(list(material['tmp']['sprites']))
                 print("  (pose set randomly to " + pose + ")")
             else:
@@ -685,7 +685,7 @@ def unit_is_on_ground(name, double_jump_y=kEpsilon):
             else:
                 return False
     return None
-        
+
 def unit_jump(name, vel_y, vel_x=None, vel_z=None,
         double_jump_y=kEpsilon):
     blocks = world['blocks']
@@ -749,7 +749,7 @@ def draw_frame(screen):
     places = 2
     passed = 0.0  # seconds
     passed_ms = 0
-    this_frame_ticks = pg.time.get_ticks() 
+    this_frame_ticks = pg.time.get_ticks()
     fps = 0.0  # clock.get_fps()
     global fps_s
     global world
@@ -770,7 +770,7 @@ def draw_frame(screen):
             # fps_s = str(clock.get_fps())  # clock is only in game
     else:
         prev_frame_ticks = this_frame_ticks
-    
+
     if visual_debug_enable:
         push_text("block_scale_horz: " + str(block_scale_horz))
         push_text("FPS: " + fps_s)
@@ -808,7 +808,7 @@ def draw_frame(screen):
     #scaled_block_size = (game_tile_size[0] * block_scale_horz,
     #                     game_tile_size[1] * block_scale_vert)
     scaled_block_size = None
-    
+
     for try_size in good_45deg_tile_sizes:
         if try_size[0] >= ideal_tile_w:
             scaled_block_size = try_size
@@ -817,7 +817,7 @@ def draw_frame(screen):
         push_text("Unknown nearest block size to ideal " +
                   "tile size " + str((ideal_tile_w, ideal_tile_h)))
         scaled_block_size = good_45deg_tile_sizes[-1]
-    
+
     if block_scale_horz is None:
         if desired_scale is None:
             block_scale_horz = (ideal_tile_w / game_tile_size[0])
@@ -861,7 +861,7 @@ def draw_frame(screen):
     #scalable_surf.fill((0, 0, 0))
     screen.fill((0, 0, 0))
     #camera_loc = get_loc_at_px(camera['pos'])
-    camera_loc = get_loc_at_pos(camera['pos'])    
+    camera_loc = get_loc_at_pos(camera['pos'])
     # For determining draw range:
     #block_counts = (math.ceil(scaled_size[0] / game_tile_size[0]),
     #                math.ceil(scaled_size[1] / game_tile_size[1]))
@@ -883,13 +883,13 @@ def draw_frame(screen):
     #screen_half = scaled_size[0] / 2, scaled_size[1] / 2
     screen_half = win_size[0] / 2, win_size[0] / 2
     w, h = scaled_block_size
-    
+
     blocks = world['blocks']
     # for k, v in blocks.items():
     block_y = start_loc[1]
     camera_px = (int(camera['pos'][0] * scaled_block_size[0]),
                  int(camera['pos'][2] * scaled_block_size[1]))
-    
+
     while block_y >= end_loc[1]:
         block_x = start_loc[0]
         while block_x <= end_loc[0]:
@@ -917,7 +917,7 @@ def draw_frame(screen):
                                 anim.lowlight = .9
                             else:
                                 anim.lowlight = .75
-                            side = anim.get_lit_surface()
+                            side = anim.get_lowlit_surface()
                         block_vec2 = vec2_from_vec3_via_camera(pos, camera_vec2=camera_px)
                         x, y = block_vec2
                         x -= scaled_block_size[0]/2
@@ -956,7 +956,7 @@ def draw_frame(screen):
         skB = get_key_at_pos(posB)
         ground_yA = None
         #ground_yA = unit['tmp'].get('prev_ground_yB')
-        
+
         if ground_yA is None:
             stackA = blocks.get(skA)
             if stackA is not None:
@@ -1085,11 +1085,11 @@ def draw_frame(screen):
             ground_yB = float(len(stackB))
         else:
             ground_yB = nothing_y
-        
+
         # offset = -block_rise_as_y_px
         #prev_agl = posA[1] - ground_yA
         #agl: # above ground level
-        
+
         aglB = posB[1] - ground_yB
         # if debug_unit:
             # push_text("  processing.ground_y:" + str(ground_yB))
@@ -1116,14 +1116,14 @@ def draw_frame(screen):
             unit['tmp']['at_edge'] = True
         else:
             unit['tmp']['at_edge'] = False
-        
+
         if posB[1] < ground_yB:
             # push_msg = "pushed up"
                        # fmt_f(posB[1]) + " to " + fmt_f(ground_yB)
             aglB = 0.0
             posB[1] = ground_yB
             moved_vec3[1] = posB[1] - posA[1]
-                
+
         if aglB <= 0.0:
             if debug_unit:
                 push_text("on ground " + push_msg)
@@ -1133,10 +1133,10 @@ def draw_frame(screen):
         else:
             if debug_unit:
                 push_text("airborne")
-        
+
         unit['pos'] = (posB[0], posB[1], posB[2])
-            
-        
+
+
         if limited_horz:
             skB = get_key_at_pos(unit['pos'])
             stackB = blocks.get(skB)
@@ -1144,13 +1144,14 @@ def draw_frame(screen):
                 ground_yB = float(len(stackB))
             else:
                 ground_yB = nothing_y
-        push_text("  unit['mps_vec3']: " +
-                  fmt_vec(unit['mps_vec3'], places=places))
+        if debug_unit:
+            push_text("  unit['mps_vec3']: " +
+                      fmt_vec(unit['mps_vec3'], places=places))
         unit['tmp']['prev_ground_yB'] = ground_yB
         src_size = anim.get_surface().get_size()
         # if x+w < 0 or x >= win_size[0]:
         #     continue
-        
+
         this_size = src_size[0]*sprite_scale, src_size[1]*sprite_scale
         x, y = vec2_from_vec3_via_camera(unit['pos'], camera_vec2=camera_px)
         x -= this_size[0] / 2
@@ -1185,7 +1186,7 @@ def draw_frame(screen):
                                  target_size[0],
                                  target_size[1])
                         )
-    
+
     if (popup_surf is None) or (popup_showing_text != popup_text):
         if popup_text is not None:
             popup_surf = default_font.render(
@@ -1269,7 +1270,7 @@ def push_text(s, color=(255,255,255), screen=None):
     if screen is not None:
         temp_screen = screen
     if temp_screen is not None:
-        
+
         try:
             s_surf = default_font.render(s, settings['text_antialiasing'],
                                          color)
@@ -1279,9 +1280,9 @@ def push_text(s, color=(255,255,255), screen=None):
         except AttributeError:  #pygame zero (mobile)
             temp_screen.draw.text("Outlined text", text_pos, owidth=1.5, ocolor=(255,255,0), color=(0,0,0), fontsize=14)
             text_pos[1] += 18
-# series: if more than one frame, you can pass pre-generated sprite loop 
+# series: if more than one frame, you can pass pre-generated sprite loop
 # order: (requires len(series)>1) indices of frames specifying order
-# starting at 1 
+# starting at 1
 def _load_sprite(what, cells, order=None, gettable=True,
                      pose=None, path=None, has_ai=False,
                      native=True, overlayable=False,
@@ -1468,7 +1469,7 @@ def _place_unit(what, name, pos, pose=None, animate=True, overrides=None):
     if overrides is not None:
         for k,v in overrides.items():
             units[name][k] = v
-    
+
 
 def stop_unit(name):
     unit = units[name]
@@ -1532,7 +1533,7 @@ def get_gobs_at(loc):
     # sk for spatial key
     sk = str(loc[0])+","+str(loc[1])
     raise NotImplementedError("NYI")
-    return result    
+    return result
 
 def _place_world():
     if last_loaded_path is None:
@@ -1634,7 +1635,7 @@ def load_world(name, generate=False):
                 if node['what'] is not None:
                     default_animate = \
                         materials[node['what']].get('default_animate')
-                    if default_animate is True: 
+                    if default_animate is True:
                         node['animate'] = True
                     # else None or False so don't waste storage space
                     material = materials[node['what']]
