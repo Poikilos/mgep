@@ -18,14 +18,13 @@ This demo is possible using 1 printable page of code in 10pt font
 * framerate-independent sprite animation
 * 3D metric positioning and physics
 
-## Known Issues
+## Issues
+~: low-priority
 * allow custom delay_count
 * is iterator logic from pygame wiki's spritesheets wrong (the index
   is always 1 ahead of the frame)?
 * move frame order logic from SpriteStripAnim to material
-
-## Issues
-~: low-priority
+* change from blit to blits for speed (Pygame 1.9.4 feature)
 * Examples
 * Flipping direction of graphics
 * Transient effects (remove on animation end)
@@ -42,6 +41,7 @@ This demo is possible using 1 printable page of code in 10pt font
 * (~) Sprite constructs with offsets (clothes, weapons, 2-square sprites)
 * (~) Re-edging
 * (~) implement a callback binding system, to avoid issue: since offscreen buffer is used named `scalable_surf` and writing to it before or after calling draw_screen does nothing, and writing to screen after draw_screen doesn't scale what is drawn.
+* (~) possibly switch to pypy-pygame for JavaScript support
 
 ## Changes
 
@@ -61,7 +61,7 @@ making helpful assumptions.
 * adding sprites by row, col uses last loaded tileset
 * walk speed based on real life: 2 meters per second, in 3 steps (such as left, right, left)
   --so delay_count is 20, so that sprite animations will always be 3 FPS (which is good for for sprite sheets with 3-frame [left, middle, right] animations, such as so-called "3x4" sprite sheets with `order=[1,2,1,3]`)
-* if you do move_y by positive number, and have loaded a pose called 'walk.down', then the sprite's pose will be set to 'walk.down' 
+* if you do move_y by positive number, and have loaded a pose called 'walk.down', then the sprite's pose will be set to 'walk.down'
 * if you add a material more than once it will be more common
 * if you run `stop_unit`, idle animation will be used, and if 'idle' key is not in `materials[sprite[what]]['tmp']['sprites']` dictionary, then `sprite['animate']` will be set to `False`.
   * keeps track of facing direction (if move_x and move_y are used) and look for 'idle.left' etc and only
