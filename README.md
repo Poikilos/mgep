@@ -75,6 +75,12 @@ that specifies and attribution license such as CC BY)
 https://github.com/poikilos/mgep/blob/master/LICENSE
 
 ## Developer Notes:
+* additional tilesets to try/convert to 1/sqrt(2) ratio:
+  * https://opengameart.org/content/zrpg-tiles
+  * https://opengameart.org/content/castle-tiles-for-rpgs
+    * split by author
+  * https://opengameart.org/content/consolidated-hard-vacuum-terrain-tilesets
+  * https://opengameart.org/content/2d-lost-garden-zelda-style-tiles-resized-to-32x32-with-additions
 * camera is similar to default opengl view space camera, where z is positive moving toward camera (but tilted upward, greater z also moves down toward bottom of screen)
 * variable naming:
   * _mps: meters per second
