@@ -55,6 +55,7 @@ making helpful assumptions.
 * place the mgep folder in the directory of your project
 * `from mgep import *`
 * for more information, see example*.py
+  * if you don't want the player to be able to use the F3 key, or any other engine hotkey: handle the key before `else` in keydown case. To eliminate use of all engine hotkeys, simply don't call `other_keydown`.
 
 ## Helpful Assumptions
 * loading a tileset makes a top view game
@@ -85,11 +86,11 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
 * variable naming:
   * _mps: meters per second
   * _accel: meters per second squared
-  * pose is a string referring to an animation, structured as `mode+'.'+cardinal` where cardinal is a direction ssuch as `'walk.N'`
-  * heading is direction pointing, course is direction moving
-  * agl is above ground level
-  * horz is horizontal
-  * vert is vertical
+  * `pose` is a string referring to an animation, structured as `mode+'.'+cardinal` where cardinal is a direction--for example, `'walk.N'`.
+  * `heading` is direction pointing, `course` is direction moving.
+  * `agl` is above ground level
+  * `horz` is horizontal
+  * `vert` is vertical
 * optional unit values (to override defaults):
   * `'max_land_mps'`: maximum meters per second land speed
   * `'max_land_accel'`: maximum meters per second squared land speed

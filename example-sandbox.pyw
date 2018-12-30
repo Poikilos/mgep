@@ -42,7 +42,6 @@ screen = pg.display.set_mode((1000, 700), pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZ
 # screen = pg.display.set_mode((720, 400),pg.FULLSCREEN)
 # screen = pg.display.set_mode((640, 480),pg.FULLSCREEN)
 clock = pg.time.Clock()
-set_visual_debug(True)
 done = False
 #load_tileset("tiny-16-basic/basictiles.png", 8, 15)
 #add_material("grass", 9, 1)
@@ -78,6 +77,7 @@ place_character('female', npc_name, (2,0))
 items = load(player_name, default=[])
 set_unit_value(player_name, 'items', items)
 
+set_visual_debug(True)
 
 def on_draw_ui(e):
     surf = e.get('screen')
@@ -152,8 +152,8 @@ while not done:
                     show_popup("cannot jump while airborne")
             elif event.key == pg.K_ESCAPE:
                 done = True
-            elif event.key == pg.K_F3:
-                toggle_visual_debug()
+            else:
+                other_keydown(event)
         elif event.type == pg.KEYUP:
             stop_unit(player_name)
         elif event.type == pg.VIDEORESIZE:

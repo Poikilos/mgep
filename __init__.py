@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import division  # `//` floor division
+
 try:
     import pygame as pg
 except:
@@ -32,13 +34,14 @@ except ImportError:
 TAU = math.pi * 2.
 NEG_TAU = -TAU
 sqrt_2 = math.sqrt(2.0)
-kEpsilon = 1.0E-6 # adjust to suit.  If you use floats, you'll
-                  # probably want something like 1.0E-7 (added
-                  # by expertmm [tested: using 1.0E-6 since python 3
-                  # fails to set 3.1415927 to 3.1415926
-                  # see delta_theta in KivyGlops]
+kEpsilon = 1.0E-6  # adjust to suit.  If you use floats, you'll
+                   # probably want something like 1.0E-7 (added
+                   # by expertmm [tested: using 1.0E-6 since python 3
+                   # fails to set 3.1415927 to 3.1415926
+                   # see delta_theta in KivyGlops]
 # the world is a dict of lists (multiple gobs can be on one location)
-#good_45deg_tile_sizes = [(17,12), (34,24), (41,29), (58,41), (75,53), (92,65)]
+# good_45deg_tile_sizes = [(17,12), (34,24), (41,29), (58,41), (75,53),
+#                          (92,65)]
 good_45deg_tile_sizes = []
 
 block_rise_as_y_px = 1
@@ -63,7 +66,7 @@ visual_debug_enable = False
 bindings = {}
 bindings['draw_ui'] = []
 nothing_y = -10.0
-
+checkerboard = {}
 # when: an event name such as 'draw_ui'
 # f: a function formatted like `def on_draw_ui(e)` so e can be filled
 #    with a dict
@@ -159,6 +162,10 @@ last_loaded_world_name = None
 temp_screen = None
 text_pos = [0, 0]
 last_loaded_path = None
+preview_tileset_path = None
+preview_tile_info = {}
+preview_tile_info["col"] = 0
+preview_tile_info["row"] = 0
 # material spec:
 # path: each material belongs to a tileset (saved as path string)
 # serials: dict of tuple lists (coordinates of block in tileset). pose
@@ -236,12 +243,91 @@ def save(name, data):  # , file_format='list'):
     with open(path, "w") as outs:
         json.dump(data, outs)
 
+def get_preview_tileset_path():
+    return preview_tileset_path
+
+# If preview_tileset_path is None after calling this, you've reached the
+# end, so calling this again will select the first one.
+def cycle_preview_tileset():
+    global preview_tileset_path
+    found = False
+    changed = False
+    last = None
+    first = None
+    for k,v in file_surfaces.items():
+        if first is None:
+            first = k
+        if preview_tileset_path is None:
+            preview_tileset_path = k
+            changed = True
+            break
+        last = k
+        if found:
+            if not changed:
+                preview_tileset_path = k
+                changed = True
+        if k == preview_tileset_path:
+            found = True
+    if (found is True) and (changed is False):
+        # go past end
+        preview_tileset_path = None
+    if (found is False) and (changed is False):
+        prev = preview_tileset_path
+        preview_tileset_path = first
+        print("WARNING: Preview '" + prev + "' does not exist, " +
+              "so using '" + first + "'")
+
+def change_preview_tile(move_x=None, move_y=None):
+    if preview_tileset_path is None:
+        cycle_preview_tileset()
+    if preview_tileset_path is None:
+        return
+    path = preview_tileset_path
+    cell_size = tilesets[path]['tile_size']  # aka _get_tile_src_size
+    surf = file_surfaces.get(path)
+    if surf is not None:
+        size = file_surfaces[path].get_size()
+        cols = int(size[0] / cell_size[0])
+        rows = int(size[1] / cell_size[1])
+        if (move_x is None and move_y is None):
+            move_x = 1
+            move_y = 0
+        elif move_x is None:
+            move_x = 0
+        elif move_y is None:
+            move_y = 0
+        preview_tile_info['col'] += move_x
+        preview_tile_info['row'] += move_y
+        # starts at 0 so remember to add 1 before displaying col,row
+        if preview_tile_info['col'] < 0:
+            preview_tile_info['row'] += preview_tile_info['col'] // cols
+            print(str(cols) + "cols - col" +
+                  str(preview_tile_info['col']) + " = col" +
+                  str(cols - preview_tile_info['col']))
+            preview_tile_info['col'] = cols + preview_tile_info['col']
+            preview_tile_info['col'] %= cols
+        if preview_tile_info['row'] < 0:
+            preview_tile_info['row'] = rows + preview_tile_info['row']
+        if preview_tile_info['col'] >= cols:
+            preview_tile_info['row'] += preview_tile_info['col'] // cols
+            preview_tile_info['col'] %= cols
+        if preview_tile_info['row'] >= rows:
+            preview_tile_info['row'] %= rows
+    else:
+        preview_tile_info['col'] = 0
+        preview_tile_info['row'] = 0
+
 def toggle_visual_debug():
     global visual_debug_enable
+    if preview_tileset_path is None:
+        cycle_preview_tileset()
     if visual_debug_enable:
         set_visual_debug(False)
     else:
         set_visual_debug(True)
+
+def get_visual_debug():
+    return visual_debug_enable
 
 def set_visual_debug(boolean):
     global visual_debug_enable
@@ -771,9 +857,6 @@ def draw_frame(screen):
     else:
         prev_frame_ticks = this_frame_ticks
 
-    if visual_debug_enable:
-        push_text("block_scale_horz: " + str(block_scale_horz))
-        push_text("FPS: " + fps_s)
 
     if default_font is None:
         default_font = pg.font.SysFont(settings['sys_font_name'],
@@ -805,8 +888,8 @@ def draw_frame(screen):
         ideal_tile_w = win_size[0] / ideal_min_m  # no perspective
         ideal_tile_h = ideal_tile_w * block_aspect
     block_scale_vert = None
-    #scaled_block_size = (game_tile_size[0] * block_scale_horz,
-    #                     game_tile_size[1] * block_scale_vert)
+    # scaled_block_size = (game_tile_size[0] * block_scale_horz,
+    #                      game_tile_size[1] * block_scale_vert)
     scaled_block_size = None
 
     for try_size in good_45deg_tile_sizes:
@@ -1218,6 +1301,7 @@ def draw_frame(screen):
             screen.blit(popup_shadow_surf,
                         (text_pos[0]+2,text_pos[1]+1))
             # scalable_surf.blit
+
             screen.blit(popup_surf,
                         (text_pos[0],text_pos[1]))
             text_size = popup_surf.get_size()
@@ -1233,6 +1317,69 @@ def draw_frame(screen):
     show_stats_once()
     if camera_target_unit_name is not None:
             move_camera_to(camera_target_unit_name)
+
+    if visual_debug_enable:
+        push_text("block_scale_horz: " + str(block_scale_horz))
+        push_text("FPS: " + fps_s)
+        path = preview_tileset_path
+        tileset = None
+        preview_surf = None
+        # make checkerboard bg:
+        cb_surf = checkerboard.get("surf")
+        # preview_pane_size = (win_size[0] - preview_pos[0],
+                             # win_size[1] - preview_pos[1])
+        if path is not None:
+            preview_surf = file_surfaces.get(path)
+            tileset = tilesets.get(path)
+
+
+        cell_size = None
+        cols = None
+        rows = None
+        col = preview_tile_info['col']
+        row = preview_tile_info['row']
+        if (preview_surf is not None) and (tileset is not None):
+            cell_size = tileset['tile_size']
+            preview_pane_size = preview_surf.get_size()
+            pre_box_pos = (win_size[0] / 2, win_size[1] / 2)
+            hs = cell_size[0] // 2, cell_size[1] // 2
+            cols = preview_surf.get_size()[0] // cell_size[0]
+            rows = preview_surf.get_size()[1] // cell_size[1]
+            pre_box_pos = pre_box_pos[0] - hs[0], pre_box_pos[1] - hs[1]
+            pre_mov = (col*cell_size[0], row*cell_size[1])
+            preview_pos = (pre_box_pos[0]-pre_mov[0],
+                           pre_box_pos[1]-pre_mov[1])
+            preview_rect = pg.Rect(preview_pos, preview_pane_size)
+            screen.blit(preview_surf, preview_pos)
+
+            if (cb_surf is None) or (preview_rect != checkerboard['rect']):
+                cb_surf = pg.Rect(preview_rect)
+                checkerboard['surf'] = cb_surf
+                checkerboard['rect'] = preview_rect.copy()
+
+            pg.draw.rect(screen, (128, 128, 128), preview_rect.inflate(2, 2), 1)
+            pg.draw.rect(screen, (0, 0, 0), preview_rect.inflate(4, 4), 1)
+            if cell_size is not None:
+                inner_rect = pg.Rect(pre_box_pos, cell_size)
+                inner_rect.inflate_ip(2, 2)
+                outer_rect = inner_rect.inflate(2, 2)
+                pg.draw.rect(screen, (255, 255, 255), inner_rect, 1)
+                pg.draw.rect(screen, (0, 0, 0), outer_rect, 1)
+            push_text("preview_tileset: ")
+            push_text("  cell_size: " + str(cell_size))
+
+        push_text("preview_tile: ")
+        if ((col >= 0) and (row >= 0)):
+            push_text("  col,row: " +
+                      str(col+1) + "," +
+                      str(row+1))
+            if cols is not None:
+                push_text("  ID: " + str(row*cols+col))
+
+        else:
+            push_text("  col,row: None")
+
+
 
 show_stats_enable = True
 def show_stats_once():
@@ -1518,6 +1665,18 @@ def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
             t_s[0] < 1 or t_s[1] < 1:
         raise ValueError("tileset geometry is nonsensical: derived "
               "tile size " + str(f_s) + " should be whole number > 0")
+
+def other_keydown(event):
+    if event.key == pg.K_F3:
+        toggle_visual_debug()
+    elif event.key == pg.K_UP:
+        change_preview_tile(move_x=0, move_y=-1)
+    elif event.key == pg.K_LEFT:
+        change_preview_tile(move_x=-1, move_y=0)
+    elif event.key == pg.K_DOWN:
+        change_preview_tile(move_x=0, move_y=1)
+    elif event.key == pg.K_RIGHT:
+        change_preview_tile(move_x=1, move_y=0)
 
 def get_loc_at_pos(pos):
     world_loc = (int(pos[0]), int(pos[2]))
