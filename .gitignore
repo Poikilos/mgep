@@ -105,3 +105,4 @@ venv.bak/
 /.directory
 /.README.md.kate-swp
 /settings-mgep.json
+/err.txt
