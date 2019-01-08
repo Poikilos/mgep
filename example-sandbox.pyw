@@ -40,8 +40,11 @@ else:
 # endregion Fix the import pathing
 
 pg.init()
-screen = pg.display.set_mode((1000, 700), pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE)
-#set_scale(2)
+screen = pg.display.set_mode(
+    (1000, 700),
+    pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE
+)
+# set_scale(2)
 # screen = pg.display.set_mode((720, 400),pg.FULLSCREEN)
 # screen = pg.display.set_mode((640, 480),pg.FULLSCREEN)
 clock = pg.time.Clock()
@@ -50,7 +53,11 @@ done = False
 # add_material("grass", 9, 1)
 # add_material("grass", 9, 2)
 # add_material("dirt", 10, 1)
-load_tileset('mgep/collections/misc/underworld_load-outdoor-32x32.png', 8, 8)
+load_tileset(
+    'mgep/collections/misc/underworld_load-outdoor-32x32.png',
+    8,
+    8
+)
 load_material('bedrock', 7, 2, native=False)
 load_material('dirt', 1, 2)
 load_material('grass', 1, 3)
@@ -69,7 +76,11 @@ load_material('grass', 3, 3)
 load_tileset('mgep/sprites/Hyptosis/people.png', 4, 8)
 load_character_3x4('male', 1, 1)
 load_character_3x4('female', 1, 5)
-# load_tileset('mgep/collections/misc/underworld_load-atlas-32x32.png', 16, 16)
+# load_tileset(
+    # 'mgep/collections/misc/underworld_load-atlas-32x32.png',
+    # 16,
+    # 16
+ # )
 
 world = load_world('world1', generate=True)
 player_name = 'Steamy'
@@ -107,7 +118,7 @@ def on_draw_ui(e):
             counts[what] += 1
         for what, count in counts.items():
             mat_surf = None
-            #pose = item.get('pose')
+            # pose = item.get('pose')
             anim = get_anim_from_mat_name(what)  # , pose=pose)
             mat_surf = anim.get_surface()
             if mat_surf is None:
@@ -136,15 +147,17 @@ while not done:
                 item = pop_node(a)
                 if item is not None:
                     items.append(item)
-                    # show_popup("You have " + str(get_whats(get_unit_value(player_name, 'items'))))
+                    # p_items = get_unit_value(player_name, 'items')
+                    # show_popup("You have " + str(get_whats(p_items)))
                 else:
                     show_popup("You can't dig any deeper")
-            elif event.key == pg.K_INSERT:  # or event.key == pg.K_PAGEDOWN:
+            elif event.key == pg.K_INSERT:
+                # or event.key == pg.K_PAGEDOWN:
                 items = get_unit_value(player_name, 'items')
                 if len(items) > 0:
                     a = get_selected_node_key()
                     blocks = get_blocks(a)
-                    #if blocks is not None:
+                    # if blocks is not None:
                     item = items[-1]
                     del items[-1]
                     blocks.append(item)
@@ -160,7 +173,10 @@ while not done:
         elif event.type == pg.KEYUP:
             stop_unit(player_name)
         elif event.type == pg.VIDEORESIZE:
-            screen = pg.display.set_mode(event.size, pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE)
+            screen = pg.display.set_mode(
+                event.size,
+                pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE
+            )
             resize_count += 1
             print("resized to " + str(event.size) + \
                   " {resize_count:" + str(resize_count) + "}")
