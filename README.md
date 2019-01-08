@@ -83,6 +83,22 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
   * https://opengameart.org/content/consolidated-hard-vacuum-terrain-tilesets
   * https://opengameart.org/content/2d-lost-garden-zelda-style-tiles-resized-to-32x32-with-additions
 * camera is similar to default opengl view space camera, where z is positive moving toward camera (but tilted upward, greater z also moves down toward bottom of screen)
+* material spec:
+  * path: each material belongs to a tileset (saved as path string)
+  * serials: dict of tuple lists (coordinates of block in tileset). pose
+    * subkey can be generated, but could also be special such as tr.grass
+    * Coordinates are address as (x,y) by block (not pixel) starting at 1.
+    * for top right of material such as mud where merges with grass,
+    * or tr if material has alpha allowing merge with anything under it.
+    * each item in the dict is a tile in the tileset.
+    * serials[pose] is ALWAYS a list()
+* world spec:
+  * world is a dict where key is a location such as '0,0' and value is a list.
+    * each list contains nodes
+      * each node is a dict with 'what' and 'pose' strings
+        where node['what'] is a material key and node['pose'] is a key
+        for the material[node['what']]['tmp']['sprites'] dictionary.
+
 * variable naming:
   * _mps: meters per second
   * _accel: meters per second squared

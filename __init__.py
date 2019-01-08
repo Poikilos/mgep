@@ -46,13 +46,23 @@ good_45deg_tile_sizes = []
 
 block_rise_as_y_px = 1
 tilesets = {}
+heightmap_key = "cave"
+heightmap = {}
+data_path = os.path.dirname(os.path.abspath(__file__))
+maps_path = os.path.join(data_path, "maps")
+mesas_path = os.path.join(maps_path, "mesa")
+if not os.path.isdir(maps_path):
+    print("ERROR: no maps directory in same directory as " + __file__)
+heightmap['mesa_path'] = os.path.join(mesas_path, heightmap_key+".png")
+if not os.path.isfile(heightmap['mesa_path']):
+    print("ERROR: missing mesa image '" + heightmap['mesa_path'] + "'")
 file_surfs = {}
 surf_paths = []  # keys for file_surfs in order of loading
 materials = {}
 material_choose = [None]
 world = {}
 world['blocks'] = {}
-#screen = None
+# screen = None
 player_unit_name = None
 game_tile_size = None
 units = {}
@@ -116,11 +126,11 @@ while w<=1024:
     h = two_h / 2.0
     if int(round(h)) * 2 == int(two_h) and abs_slack(two_h) < .15:
         good_45deg_tile_sizes.append((w, int(h)))
-        #print(str((w, int(h))))
-    #else:
-        #print("NOT " + str((w, int(h))))
-        #print("  abs_slack: " + str(abs_slack(two_h)))
-        #print("  two_h: " + str(two_h))
+        # print(str((w, int(h))))
+    # else:
+        # print("NOT " + str((w, int(h))))
+        # print("  abs_slack: " + str(abs_slack(two_h)))
+        # print("  two_h: " + str(two_h))
     w += 1
 data = None
 settings_path = "settings-mgep.json"
@@ -130,7 +140,7 @@ if os.path.isfile(settings_path):
 got = data
 if got is None: got = {}
 print("settings path: " + os.path.abspath(settings_path))
-#print("settings loaded: " + str(got))
+# print("settings loaded: " + str(got))
 settings = {}
 settings['popup_sec_per_glyph'] = got.get('popup_sec_per_glyph', .04)
 settings['popup_alpha_per_sec'] = got.get('popup_alpha_per_sec', 128.0)
@@ -165,25 +175,8 @@ text_pos = [0, 0]
 preview_tileset_i = None  # index in surf_paths list
 last_loaded_path = None
 gui_state = {}
-gui_state["col"] = 0
-gui_state["row"] = 0
-# material spec:
-# path: each material belongs to a tileset (saved as path string)
-# serials: dict of tuple lists (coordinates of block in tileset). pose
-#   subkey can be generated, but could also be special such as tr.grass
-#   Coordinates are address as (x,y) by block (not pixel) starting at 1.
-#   for top right of material such as mud where merges with grass,
-#   or tr if material has alpha allowing merge with anything under it.
-#   each item in the dict is a tile in the tileset.
-#   serials[pose] is ALWAYS a list()
-#
-# world spec:
-# * world is a dict where key is a location such as '0,0' and value
-#   is a list.
-#   * each list contains nodes
-#     * each node is a dict with 'what' and 'pose' strings
-#       where node['what'] is a material key and node['pose'] is a key
-#       for the material[node['what']]['tmp']['sprites'] dictionary.
+gui_state['select.x'] = 0
+gui_state['select.y'] = 0
 
 camera = {}
 camera['pos'] = (0, 0, 0)
@@ -198,17 +191,17 @@ min_fps_ticks = 1000
 total_ticks = 0
 frame_count = 0
 fps_s = "?"
-#scalable_surf = None
-#scalable_surf_scale = None
+# scalable_surf = None
+# scalable_surf_scale = None
 
-#region reinitialized each frame
+# region reinitialized each frame
 win_size = None
-#scaled_size = None
+# scaled_size = None
 scaled_block_size = None
 block_half_counts = None
 start_loc = None
 end_loc = None
-#endregion reinitialized each frame
+# endregion reinitialized each frame
 
 def fmt_f(f, fmt=None, places=1):
     if fmt is None:
@@ -240,7 +233,7 @@ def load(name, default=None):
 
 def save(name, data):  # , file_format='list'):
     path = name + '.json'
-    #save1d.save(name, data, file_format=file_format)
+    # save1d.save(name, data, file_format=file_format)
     with open(path, "w") as outs:
         json.dump(data, outs)
 
@@ -248,10 +241,6 @@ def get_preview_tileset_path():
     ret = None
     try:
         ret = surf_paths[preview_tileset_i]
-    # except KeyError:
-        # pass
-    # except IndexError:
-        # pass
     except TypeError:
         pass
     return ret
@@ -265,19 +254,12 @@ def cycle_preview_tileset(by=1):
     Keyword arguments:
     by -- direction to cycle, positive for order loaded (default 1)
     """
-    print("  cycle_preview_tileset...")
-    print("    by: " + str(by))
     global preview_tileset_i
     was_None = False
     if preview_tileset_i is None:
         was_None = True
-        if by < 0:
-            print("    LOADING last tileset...")
-        else:
-            print("    LOADING first tileset...")
     if len(surf_paths) < 1:
         preview_tileset_i = None
-        print("    INFO: No surf_paths, so nothing to cycle.")
         return
     if preview_tileset_i is None:
         if by < 0:
@@ -291,9 +273,9 @@ def cycle_preview_tileset(by=1):
         elif preview_tileset_i < 0:
             preview_tileset_i = None
     # tileset cursor must be set for tileset preview to be visible:
-    if gui_state.get('col') is None:
-        gui_state['col'] = 0
-        gui_state['row'] = 0
+    if gui_state.get('select.x') is None:
+        gui_state['select.x'] = 0
+        gui_state['select.y'] = 0
     surf = None
     path = None
 
@@ -305,8 +287,8 @@ def cycle_preview_tileset(by=1):
             toggle_visual_debug(tileset_cycle_enable=False)
 
     if preview_tileset_i is None:
-        # gui_state['row'] = 0
-        # gui_state['col'] = 0
+        # gui_state['select.y'] = 0
+        # gui_state['select.x'] = 0
         return
     try:
         path = surf_paths[preview_tileset_i]
@@ -318,19 +300,15 @@ def cycle_preview_tileset(by=1):
             path = surf_paths[preview_tileset_i]
             tileset = tilesets.get(path)
             if tileset is not None:
-                if gui_state['col'] >= tileset['cols']:
-                    gui_state['col'] = tileset['cols'] - 1
+                if gui_state['select.x'] >= tileset['cols']:
+                    gui_state['select.x'] = tileset['cols'] - 1
                 if by < 0:
-                    gui_state['row'] = tileset['rows'] - 1
+                    gui_state['select.y'] = tileset['rows'] - 1
                 else:
-                    gui_state['row'] = 0
-
-
+                    gui_state['select.y'] = 0
 
 def change_preview_tile(move_x=None, move_y=None):
-    print("")
     cycle = True
-    print("preview_tileset_i: " + str(preview_tileset_i))
     was_None = False
     move_enable = True
     orig_move_y = move_y
@@ -356,7 +334,7 @@ def change_preview_tile(move_x=None, move_y=None):
         move_x = 0
         move_y = 0
     if preview_tileset_i is None:
-        print("# preview_tileset_i: None  # should NEVER HAPPEN")
+        print("ERROR: preview_tileset_i is None in change_preview_tile")
         return
     path = surf_paths[preview_tileset_i]
     tileset = tilesets[path]
@@ -373,36 +351,29 @@ def change_preview_tile(move_x=None, move_y=None):
             move_x = 0
         elif move_y is None:
             move_y = 0
-        gui_state['col'] += move_x
-        gui_state['row'] += move_y
-        print("MOVED from " + str(gui_state['row']-move_y) + " to " +
-              str(gui_state['row']))
-        if gui_state['col'] < 0:
-            gui_state['row'] += gui_state['col'] // cols
-            print("WRAPPED down by " + str(gui_state['col'] // cols))
-            gui_state['col'] = cols + gui_state['col']
-            gui_state['col'] %= cols
-        if gui_state['row'] < 0:
-            # gui_state['row'] = rows + gui_state['row']
+        gui_state['select.x'] += move_x
+        gui_state['select.y'] += move_y
+        if gui_state['select.x'] < 0:
+            gui_state['select.y'] += gui_state['select.x'] // cols
+            gui_state['select.x'] = cols + gui_state['select.x']
+            gui_state['select.x'] %= cols
+        if gui_state['select.y'] < 0:
             if cycle:
                 cycle = False
                 cycle_preview_tileset(by=by)
                 cols = tileset['cols']
                 rows = tileset['rows']
-        if gui_state['col'] >= cols:
-            gui_state['row'] += gui_state['col'] // cols
-            gui_state['col'] %= cols
-        if gui_state['row'] >= rows:
-            gui_state['row'] %= rows
+        if gui_state['select.x'] >= cols:
+            gui_state['select.y'] += gui_state['select.x'] // cols
+            gui_state['select.x'] %= cols
+        if gui_state['select.y'] >= rows:
+            gui_state['select.y'] %= rows
             if cycle:
                 cycle_preview_tileset(by=by)
-
-        print("gui_state: " + str(gui_state))
     else:
-        gui_state['col'] = 0
-        gui_state['row'] = 0
-        print("surf: None  # should never happen--change_preview_tile")
-    print("final preview_tileset_i: " + str(preview_tileset_i))
+        gui_state['select.x'] = 0
+        gui_state['select.y'] = 0
+        print("ERROR: surf is None in change_preview_tile")
 
 def toggle_visual_debug(tileset_cycle_enable=True):
     global visual_debug_enable
@@ -422,7 +393,6 @@ def get_visual_debug():
 def set_visual_debug(boolean):
     global visual_debug_enable
     visual_debug_enable = boolean
-    print("visual_debug_enable: " + str(visual_debug_enable))
 
 def show_popup(s):
     global popup_text
@@ -1427,8 +1397,8 @@ def draw_frame(screen):
         cell_size = None
         cols = None
         rows = None
-        col = gui_state['col']
-        row = gui_state['row']
+        col = gui_state['select.x']
+        row = gui_state['select.y']
         if (preview_surf is not None) and (tileset is not None):
             cell_size = tileset['tile_size']
             preview_pane_size = preview_surf.get_size()
@@ -1469,6 +1439,8 @@ def draw_frame(screen):
             push_text("  preview_surf: " + str(preview_surf))
             push_text("  tileset: " + str(tileset))
 
+        push_text("gui_state: " + str(gui_state))
+        push_text("")
         push_text("preview_tile: ")
         if ((col >= 0) and (row >= 0)):
             push_text("  col,row: " +
@@ -1476,7 +1448,6 @@ def draw_frame(screen):
                       str(row+1))
             if cols is not None:
                 push_text("  ID: " + str(row*cols+col))
-
         else:
             push_text("  col,row: None")
 
