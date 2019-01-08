@@ -299,10 +299,10 @@ def cycle_preview_tileset(by=1):
 
     if preview_tileset_i is None:
         if visual_debug_enable is True:
-            toggle_visual_debug()
+            toggle_visual_debug(tileset_cycle_enable=False)
     else:
         if visual_debug_enable is False:
-            toggle_visual_debug()
+            toggle_visual_debug(tileset_cycle_enable=False)
 
     if preview_tileset_i is None:
         # gui_state['row'] = 0
@@ -344,11 +344,12 @@ def change_preview_tile(move_x=None, move_y=None):
         if load_by > 0:
             load_by = 0
         cycle_preview_tileset(by=load_by)
+        cycle = False
         if visual_debug_enable is False:
-            toggle_visual_debug()
+            toggle_visual_debug(tileset_cycle_enable=False)
     else:
         if visual_debug_enable is False:
-            toggle_visual_debug()
+            toggle_visual_debug(tileset_cycle_enable=False)
 
     if not visual_debug_enable:
         # do not skip upon entering the preview
@@ -384,6 +385,7 @@ def change_preview_tile(move_x=None, move_y=None):
         if gui_state['row'] < 0:
             # gui_state['row'] = rows + gui_state['row']
             if cycle:
+                cycle = False
                 cycle_preview_tileset(by=by)
                 cols = tileset['cols']
                 rows = tileset['rows']
@@ -402,11 +404,13 @@ def change_preview_tile(move_x=None, move_y=None):
         print("surf: None  # should never happen--change_preview_tile")
     print("final preview_tileset_i: " + str(preview_tileset_i))
 
-def toggle_visual_debug():
+def toggle_visual_debug(tileset_cycle_enable=True):
     global visual_debug_enable
-    if preview_tileset_i is None:
-        cycle_preview_tileset()
-        # change_preview_tile()
+    if visual_debug_enable is False:
+        if preview_tileset_i is None:
+            if tileset_cycle_enable:
+                cycle_preview_tileset(by=0)
+            # change_preview_tile()
     if visual_debug_enable:
         set_visual_debug(False)
     else:
@@ -1771,7 +1775,10 @@ def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
 
 def other_keydown(event):
     if event.key == pg.K_F3:
-        toggle_visual_debug()
+        tileset_cycle_enable = False
+        if visual_debug_enable is False:
+            tileset_cycle_enable = True
+        toggle_visual_debug(tileset_cycle_enable=tileset_cycle_enable)
     elif event.key == pg.K_UP:
         change_preview_tile(move_x=0, move_y=-1)
     elif event.key == pg.K_LEFT:
