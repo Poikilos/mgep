@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, sys
+import os
+import sys
 import pygame as pg
 
 # region Fix the import pathing
@@ -77,21 +78,22 @@ load_tileset('mgep/sprites/Hyptosis/people.png', 4, 8)
 load_character_3x4('male', 1, 1)
 load_character_3x4('female', 1, 5)
 # load_tileset(
-    # 'mgep/collections/misc/underworld_load-atlas-32x32.png',
-    # 16,
-    # 16
- # )
+#     'mgep/collections/misc/underworld_load-atlas-32x32.png',
+#     16,
+#     16
+# )
 
 world = load_world('world1', generate=True)
 player_name = 'Steamy'
 npc_name = 'Stella'
-place_character('male', player_name, (0,0))
-place_character('female', npc_name, (2,0))
+place_character('male', player_name, (0, 0))
+place_character('female', npc_name, (2, 0))
 
 items = load(player_name, default=[])
 set_unit_value(player_name, 'items', items)
 
 set_visual_debug(True)
+
 
 def on_draw_ui(e):
     surf = e.get('screen')
@@ -103,12 +105,13 @@ def on_draw_ui(e):
         if size[1] < short_px:
             short_px = size[1]
         outline_px = int(round(short_px / 300))
-        if outline_px < 1: outline_px = 1
+        if outline_px < 1:
+            outline_px = 1
         margin_px = outline_px * 2
         square_size = (preview_size[0]+outline_px*2,
                        preview_size[1]+outline_px*2)
         x = margin_px + outline_px
-        y = size[1] - preview_size[1] - (margin_px - outline_px) -1
+        y = size[1] - preview_size[1] - (margin_px - outline_px) - 1
         color = (64, 64, 64)
         counts = {}
         for item in items:
@@ -130,9 +133,10 @@ def on_draw_ui(e):
             surf.blit(pg.transform.scale(mat_surf,
                                          (preview_size[0],
                                           preview_size[1])),
-                      (x,y))
-            draw_text_vec2(str(count), (255,255,255), surf, (x+1, y+1))
+                      (x, y))
+            draw_text_vec2(str(count), (255, 255, 255), surf, (x+1, y+1))
             x += square_size[0] + margin_px
+
 
 bind('draw_ui', on_draw_ui)
 resize_count = 0
@@ -178,7 +182,7 @@ while not done:
                 pg.HWSURFACE | pg.DOUBLEBUF | pg.RESIZABLE
             )
             resize_count += 1
-            print("resized to " + str(event.size) + \
+            print("resized to " + str(event.size) +
                   " {resize_count:" + str(resize_count) + "}")
 
     pressed = pg.key.get_pressed()
