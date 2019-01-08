@@ -2032,7 +2032,7 @@ def load_world(name, generate=False):
     print("  finished (load_world).")
 
 
-if __name__ == "__main__":
+def dump_internals():
     print()
     print("SHOWING INTERNALS")
     print("good_45deg_tile_sizes: " + str(good_45deg_tile_sizes))
@@ -2041,3 +2041,7 @@ if __name__ == "__main__":
           "from mgep import *\n"
           "#see also example-*.pyw")
     print()
+
+
+if __name__ == "__main__":
+    dump_internals()
