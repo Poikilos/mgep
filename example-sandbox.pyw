@@ -3,42 +3,18 @@ import os
 import sys
 import pygame as pg
 
-# region Fix the import pathing
-# This import pathing nonsense is only needed because this py file is in
-# the mgep directory. Place mgep directory inside your project's
-# directory to avoid this issue.
-mgep_name = "mgep"
-abs__f__ = os.path.abspath(__file__)
-if os.path.basename(os.path.dirname(abs__f__)) != "mgep":
-    mgep_name = "mgep-master"
-if os.path.basename(os.path.dirname(abs__f__)) == mgep_name:
-    sys.path.insert(0, '..')
-    print("in:"+os.getcwd())
-    sys.path.append(os.path.dirname(os.path.dirname(abs__f__)))
-    os.chdir(os.path.dirname(os.path.dirname(abs__f__)))
-    print("in:"+os.getcwd())
-    # print("script in: "+os.path.basename(os.path.dirname(abs__f__)))
-    import inspect
-    cff = inspect.getfile(inspect.currentframe())
-    currentdir = os.path.dirname(os.path.abspath(cff))
-    print("file in:" + currentdir)
-    parentdir = currentdir  # os.path.dirname(currentdir)
-    print("parentdir:" + parentdir)
-    sys.path.append(parentdir)  # insert(0, parentdir)
-if mgep_name == "mgep":
-    try:
-        from mgep import *
-    except ImportError:
-        print("missing mgep.")
-        print("try the following in git shell from project directory:")
-        print("git clone https://github.com/poikilos/mgep")
-        # print("sys.path: "+str(sys.path))
-        # print("in: "+os.getcwd())
-        exit(1)
-else:
-    print("ERROR: You must rename " + mgep_name + " to mgep")
+try:
+    from mgep import *
+except ImportError:
+    print("missing mgep.")
+    # print("try the following in git shell from projects directory:")
+    # print("git clone https://github.com/poikilos/mgep")
+    # print("then copy mgep/mgep to each specific project folder")
+    print("Try the following in Command line")
+    print(" (after installing Python 3 with"
+          " 'Add Python to PATH' option:")
+    print("pip install https://github.com/poikilos/mgep/zipball/master")
     exit(1)
-# endregion Fix the import pathing
 
 pg.init()
 screen = pg.display.set_mode(
@@ -51,9 +27,9 @@ screen = pg.display.set_mode(
 clock = pg.time.Clock()
 done = False
 # load_tileset("tiny-16-basic/basictiles.png", 8, 15)
-# add_material("grass", 9, 1)
-# add_material("grass", 9, 2)
-# add_material("dirt", 10, 1)
+# load_material("grass", 9, 1)
+# load_material("grass", 9, 2)
+# load_material("dirt", 10, 1)
 load_tileset(
     'mgep/collections/misc/underworld_load-outdoor-32x32.png',
     8,
