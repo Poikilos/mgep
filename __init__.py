@@ -46,7 +46,8 @@ good_45deg_tile_sizes = []
 
 block_rise_as_y_px = 1
 tilesets = {}
-file_surfaces = {}
+file_surfs = {}
+surf_paths = []  # keys for file_surfs in order of loading
 materials = {}
 material_choose = [None]
 world = {}
@@ -161,11 +162,11 @@ if len(spare_keys) > 0:
 last_loaded_world_name = None
 temp_screen = None
 text_pos = [0, 0]
+preview_tileset_i = None  # index in surf_paths list
 last_loaded_path = None
-preview_tileset_path = None
-preview_tile_info = {}
-preview_tile_info["col"] = 0
-preview_tile_info["row"] = 0
+gui_state = {}
+gui_state["col"] = 0
+gui_state["row"] = 0
 # material spec:
 # path: each material belongs to a tileset (saved as path string)
 # serials: dict of tuple lists (coordinates of block in tileset). pose
@@ -244,51 +245,126 @@ def save(name, data):  # , file_format='list'):
         json.dump(data, outs)
 
 def get_preview_tileset_path():
-    return preview_tileset_path
+    ret = None
+    try:
+        ret = surf_paths[preview_tileset_i]
+    # except KeyError:
+        # pass
+    # except IndexError:
+        # pass
+    except TypeError:
+        pass
+    return ret
 
-# If preview_tileset_path is None after calling this, you've reached the
-# end, so calling this again will select the first one.
-def cycle_preview_tileset():
-    global preview_tileset_path
-    found = False
-    changed = False
-    last = None
-    first = None
-    for k,v in file_surfaces.items():
-        if first is None:
-            first = k
-        if preview_tileset_path is None:
-            preview_tileset_path = k
-            changed = True
-            break
-        last = k
-        if found:
-            if not changed:
-                preview_tileset_path = k
-                changed = True
-        if k == preview_tileset_path:
-            found = True
-    if (found is True) and (changed is False):
-        # go past end
-        preview_tileset_path = None
-    if (found is False) and (changed is False):
-        prev = preview_tileset_path
-        preview_tileset_path = first
-        print("WARNING: Preview '" + prev + "' does not exist, " +
-              "so using '" + first + "'")
+def cycle_preview_tileset(by=1):
+    """
+    If preview_tileset_i is None after calling this, you've
+    reached the end, so calling this again will select the first one (or
+    last if by is negative).
+
+    Keyword arguments:
+    by -- direction to cycle, positive for order loaded (default 1)
+    """
+    print("  cycle_preview_tileset...")
+    print("    by: " + str(by))
+    global preview_tileset_i
+    was_None = False
+    if preview_tileset_i is None:
+        was_None = True
+        if by < 0:
+            print("    LOADING last tileset...")
+        else:
+            print("    LOADING first tileset...")
+    if len(surf_paths) < 1:
+        preview_tileset_i = None
+        print("    INFO: No surf_paths, so nothing to cycle.")
+        return
+    if preview_tileset_i is None:
+        if by < 0:
+            preview_tileset_i = len(surf_paths) - 1
+        else:
+            preview_tileset_i = 0
+    else:
+        preview_tileset_i += by
+        if preview_tileset_i >= len(surf_paths):
+            preview_tileset_i = None
+        elif preview_tileset_i < 0:
+            preview_tileset_i = None
+    # tileset cursor must be set for tileset preview to be visible:
+    if gui_state.get('col') is None:
+        gui_state['col'] = 0
+        gui_state['row'] = 0
+    surf = None
+    path = None
+
+    if preview_tileset_i is None:
+        if visual_debug_enable is True:
+            toggle_visual_debug()
+    else:
+        if visual_debug_enable is False:
+            toggle_visual_debug()
+
+    if preview_tileset_i is None:
+        # gui_state['row'] = 0
+        # gui_state['col'] = 0
+        return
+    try:
+        path = surf_paths[preview_tileset_i]
+    except IndexError:
+        pass
+    if path is not None:
+        if (preview_tileset_i is not None):
+            # always reset row on load even if didn't just open preview
+            path = surf_paths[preview_tileset_i]
+            tileset = tilesets.get(path)
+            if tileset is not None:
+                if gui_state['col'] >= tileset['cols']:
+                    gui_state['col'] = tileset['cols'] - 1
+                if by < 0:
+                    gui_state['row'] = tileset['rows'] - 1
+                else:
+                    gui_state['row'] = 0
+
+
 
 def change_preview_tile(move_x=None, move_y=None):
-    if preview_tileset_path is None:
-        cycle_preview_tileset()
-    if preview_tileset_path is None:
+    print("")
+    cycle = True
+    print("preview_tileset_i: " + str(preview_tileset_i))
+    was_None = False
+    move_enable = True
+    orig_move_y = move_y
+    by = 1
+    if move_y < 0:
+        by = -1
+    if preview_tileset_i is None:
+        move_y = 0  # don't skip rows on load
+        was_None = True
+        load_by = by
+        if load_by > 0:
+            load_by = 0
+        cycle_preview_tileset(by=load_by)
+        if visual_debug_enable is False:
+            toggle_visual_debug()
+    else:
+        if visual_debug_enable is False:
+            toggle_visual_debug()
+
+    if not visual_debug_enable:
+        # do not skip upon entering the preview
+        move_x = 0
+        move_y = 0
+    if preview_tileset_i is None:
+        print("# preview_tileset_i: None  # should NEVER HAPPEN")
         return
-    path = preview_tileset_path
-    cell_size = tilesets[path]['tile_size']  # aka _get_tile_src_size
-    surf = file_surfaces.get(path)
+    path = surf_paths[preview_tileset_i]
+    tileset = tilesets[path]
+    cell_size = tileset['tile_size']  # aka _get_tile_src_size
+    surf = file_surfs.get(path)
     if surf is not None:
-        size = file_surfaces[path].get_size()
-        cols = int(size[0] / cell_size[0])
-        rows = int(size[1] / cell_size[1])
+        size = file_surfs[path].get_size()
+        cols = tileset['cols']
+        rows = tileset['rows']
         if (move_x is None and move_y is None):
             move_x = 1
             move_y = 0
@@ -296,31 +372,41 @@ def change_preview_tile(move_x=None, move_y=None):
             move_x = 0
         elif move_y is None:
             move_y = 0
-        preview_tile_info['col'] += move_x
-        preview_tile_info['row'] += move_y
-        # starts at 0 so remember to add 1 before displaying col,row
-        if preview_tile_info['col'] < 0:
-            preview_tile_info['row'] += preview_tile_info['col'] // cols
-            print(str(cols) + "cols - col" +
-                  str(preview_tile_info['col']) + " = col" +
-                  str(cols - preview_tile_info['col']))
-            preview_tile_info['col'] = cols + preview_tile_info['col']
-            preview_tile_info['col'] %= cols
-        if preview_tile_info['row'] < 0:
-            preview_tile_info['row'] = rows + preview_tile_info['row']
-        if preview_tile_info['col'] >= cols:
-            preview_tile_info['row'] += preview_tile_info['col'] // cols
-            preview_tile_info['col'] %= cols
-        if preview_tile_info['row'] >= rows:
-            preview_tile_info['row'] %= rows
+        gui_state['col'] += move_x
+        gui_state['row'] += move_y
+        print("MOVED from " + str(gui_state['row']-move_y) + " to " +
+              str(gui_state['row']))
+        if gui_state['col'] < 0:
+            gui_state['row'] += gui_state['col'] // cols
+            print("WRAPPED down by " + str(gui_state['col'] // cols))
+            gui_state['col'] = cols + gui_state['col']
+            gui_state['col'] %= cols
+        if gui_state['row'] < 0:
+            # gui_state['row'] = rows + gui_state['row']
+            if cycle:
+                cycle_preview_tileset(by=by)
+                cols = tileset['cols']
+                rows = tileset['rows']
+        if gui_state['col'] >= cols:
+            gui_state['row'] += gui_state['col'] // cols
+            gui_state['col'] %= cols
+        if gui_state['row'] >= rows:
+            gui_state['row'] %= rows
+            if cycle:
+                cycle_preview_tileset(by=by)
+
+        print("gui_state: " + str(gui_state))
     else:
-        preview_tile_info['col'] = 0
-        preview_tile_info['row'] = 0
+        gui_state['col'] = 0
+        gui_state['row'] = 0
+        print("surf: None  # should never happen--change_preview_tile")
+    print("final preview_tileset_i: " + str(preview_tileset_i))
 
 def toggle_visual_debug():
     global visual_debug_enable
-    if preview_tileset_path is None:
+    if preview_tileset_i is None:
         cycle_preview_tileset()
+        # change_preview_tile()
     if visual_debug_enable:
         set_visual_debug(False)
     else:
@@ -491,14 +577,15 @@ def move_camera_to(name):
 
 
 # Spritesheet class from https://www.pygame.org/wiki/Spritesheet
-# changes by poikilos: file_surfaces cache
+# changes by poikilos: file_surfs cache
 class SpriteSheet(object):
     def __init__(self, path):
         try:
-            self.sheet = file_surfaces.get(path)
+            self.sheet = file_surfs.get(path)
             if self.sheet is None:
                 self.sheet = pg.image.load(path) #.convert_alpha()
-                file_surfaces[path] = self.sheet
+                file_surfs[path] = self.sheet
+                surf_paths.append(path)
         except pg.error as message:
             print('Unable to load spritesheet image:', path)
             raise SystemExit(message)
@@ -1321,7 +1408,7 @@ def draw_frame(screen):
     if visual_debug_enable:
         push_text("block_scale_horz: " + str(block_scale_horz))
         push_text("FPS: " + fps_s)
-        path = preview_tileset_path
+        path = get_preview_tileset_path()
         tileset = None
         preview_surf = None
         # make checkerboard bg:
@@ -1329,15 +1416,15 @@ def draw_frame(screen):
         # preview_pane_size = (win_size[0] - preview_pos[0],
                              # win_size[1] - preview_pos[1])
         if path is not None:
-            preview_surf = file_surfaces.get(path)
+            preview_surf = file_surfs.get(path)
             tileset = tilesets.get(path)
 
 
         cell_size = None
         cols = None
         rows = None
-        col = preview_tile_info['col']
-        row = preview_tile_info['row']
+        col = gui_state['col']
+        row = gui_state['row']
         if (preview_surf is not None) and (tileset is not None):
             cell_size = tileset['tile_size']
             preview_pane_size = preview_surf.get_size()
@@ -1366,7 +1453,17 @@ def draw_frame(screen):
                 pg.draw.rect(screen, (255, 255, 255), inner_rect, 1)
                 pg.draw.rect(screen, (0, 0, 0), outer_rect, 1)
             push_text("preview_tileset: ")
+            push_text("  preview_tileset_i: " + str(preview_tileset_i))
+            push_text("  path: " + path)
+            push_text("  len(file_surfs): " + str(len(file_surfs)))
             push_text("  cell_size: " + str(cell_size))
+        else:
+            push_text("preview_tileset: ")
+            push_text("  preview_tileset_i: " + str(preview_tileset_i))
+            push_text("  path: " + str(path))
+            push_text("  len(file_surfs): " + str(len(file_surfs)))
+            push_text("  preview_surf: " + str(preview_surf))
+            push_text("  tileset: " + str(tileset))
 
         push_text("preview_tile: ")
         if ((col >= 0) and (row >= 0)):
@@ -1427,6 +1524,7 @@ def push_text(s, color=(255,255,255), screen=None):
         except AttributeError:  #pygame zero (mobile)
             temp_screen.draw.text("Outlined text", text_pos, owidth=1.5, ocolor=(255,255,0), color=(0,0,0), fontsize=14)
             text_pos[1] += 18
+
 # series: if more than one frame, you can pass pre-generated sprite loop
 # order: (requires len(series)>1) indices of frames specifying order
 # starting at 1
@@ -1486,10 +1584,11 @@ def _load_sprite(what, cells, order=None, gettable=True,
         material['default_pose'] = pose
     material["overlayable"] = overlayable
     material["biome"] = biome
-    surf = file_surfaces.get(path)
+    surf = file_surfs.get(path)
     if surf is None:
         surf = pg.image.load(path) #.convert_alpha()
-        file_surfaces[path] = surf
+        file_surfs[path] = surf
+        surf_paths.append(path)
     # w, h = surf.get_size()
     # return results
 
@@ -1650,16 +1749,20 @@ def load_tileset(path, count_x, count_y, margin_l=0, margin_t=0,
     global last_loaded_path
     global tilesets
     last_loaded_path = path
-    surf = file_surfaces.get(path)
+    surf = file_surfs.get(path)
     if surf is None:
         surf = pg.image.load(path) #s.convert_alpha()
-        file_surfaces[path] = surf
+        file_surfs[path] = surf
+        surf_paths.append(path)
     w, h = surf.get_size()
     tilesets[path] = {}
     u_size = (w-margin_l-margin_r+spacing_x,
               h-margin_t-margin_b+spacing_y)
     f_s = u_size[0]/count_x-spacing_x, u_size[1]/count_y-spacing_y
     tilesets[path]['tile_size'] = int(f_s[0]), int(f_s[1])
+    cell_size = tilesets[path]['tile_size']
+    tilesets[path]['cols'] = w // cell_size[0]
+    tilesets[path]['rows'] = h // cell_size[1]
     t_s = tilesets[path]['tile_size']
     if t_s[0] != int(f_s[0]) or t_s[1] != int(f_s[1]) or \
             t_s[0] < 1 or t_s[1] < 1:
