@@ -30,6 +30,26 @@ except ImportError:
     print("ERROR: save1d library not found.")
     exit(1)
 
+E_BIT = 1
+"""east quartertiles of tile"""
+S_BIT = 2
+"""south quartertiles of tile"""
+H_BIT = 4
+"""something touches the outer horizontal side of quartertile"""
+V_BIT = 8
+"""something touches the outer vertical side of quartertile"""
+
+TOP_BIT_MASKS = [None, None, 8, 9, None, None,
+                 0, 4, 12, 13, 5, 1,
+                 2, 16, 14, 15, 7, 3,
+                 None, None, 10, 11, None, None]  # last 6 are unused
+"""Convert from already-mirrored mgep mesa mask to bitmask order
+(stored as non-mirrored, so numbers are not same as file)"""
+TOP_FROM_3x5 = [6, 8, 12, 14, 7, 7, 13, 13, 9, 11, 9, 11, 5, 4, 2, 1]
+"""Convert 'standard' (liberated pixel cup) terrain layout
+to bitmask order"""
+FRONT_OF_TOP = [None, None, None, None, None, None,
+                (3, 6), (1, 7), (5, 8)]
 
 TAU = math.pi * 2.
 NEG_TAU = -TAU
@@ -82,6 +102,24 @@ bindings['draw_ui'] = []
 nothing_y = -10.0
 checkerboard = {}
 
+# speed test: https://stackoverflow.com/questions/134626/which-is-more-\
+# preferable-to-use-in-python-lambda-functions-or-nested-functions
+def clamp(value, minv, maxv):
+    return max(min(value, maxv), minv)
+
+def z_of_byte(b):
+    return -(float(b)/255.0)
+
+def f_of_byte(b):
+    return (float(b)/255.0)
+
+def byte_of_z(n):
+    return clamp(int((-n * .5 + .5) * 255.0), 0, 255)
+
+def byte_of_f(n):
+    # NOTE: for Z of normal, remember tangent space is 0 to -1 (half
+    # depth since never points back) but maps to 128 to 255 (inverse)
+    return clamp(int((n * .5 + .5) * 255.0), 0, 255)
 
 def bind(when, f):
     """
@@ -604,6 +642,29 @@ def move_camera_to(name):
     else:
         raise ValueError("Cannot move_camera_to since no unit '" +
                          name + "'")
+
+def find_graphic(haystack_material, needle_path, needle_loc):
+    material = haystack_material
+    ret = None
+    col, row = needle_loc
+    if (material['path'] != needle_path):
+        print("ERROR: tried to use find_graphic to get a '"
+              + str(needle_path) + "' material" + "from '"
+              + material['path'] + "'")
+        return ret
+    if (col is not None) and (row is not None):
+        for pose, cells in material['serials'].items():
+            for frame_i in range(len(cells)):
+                frame = cells[frame_i]
+                if (needle_loc == frame):
+                    ret = {}
+                    ret['loc'] = needle_loc
+                    ret['pose'] = pose
+                    ret['frame_i'] = frame_i
+    else:
+        print("ERROR: tried to use find_graphic to get material at "
+              + " bad location: " + str(needle_loc))
+    return ret
 
 
 # Spritesheet class from https://www.pygame.org/wiki/Spritesheet
@@ -1163,7 +1224,7 @@ def draw_frame(screen):
     if passed is not None:
         frame_gravity = world['gravity'] * passed
     for k, unit in units.items():
-            # TODO: check for python2 units.iteritems()
+        # TODO: check for python2 units.iteritems()
         debug_unit = visual_debug_enable and (k == player_unit_name)
         material = materials[unit['what']]
         anim = material['tmp']['sprites'][unit['pose']]
@@ -1524,6 +1585,24 @@ def draw_frame(screen):
         push_text("gui_state: " + str(gui_state))
         push_text("")
         push_text("preview_tile: ")
+        for what, material in materials.items():
+            g_info = find_graphic(material, path, (col, row))
+            # g_info is either None or is dict with keys:
+            # loc, pos
+            if g_info is not None:
+                push_text("  material:")
+                default_pose = material.get('default_pose')
+                push_text("    what: " + what)
+                push_text("    pose: " + g_info['pose'])
+                # add 1 before displaying col or row
+                # push_text("    loc: " + str(g_info['loc']))
+                push_text("    frame_i: " + str(g_info['frame_i']))
+                push_text("    default_pose: " + str(default_pose))
+                break
+            else:
+                push_text("  material: None  #unused cell")
+        # TODO: asdf prerender normals and show
+
         if ((col >= 0) and (row >= 0)):
             push_text("  col,row: " +
                       str(col+1) + "," +
@@ -1624,16 +1703,16 @@ def _load_sprite(what, cells, order=None, gettable=True,
                 try_as_i += 1
                 try_as = str(try_as_i)
         else:
-            material["serials"] = {}
+            material['serials'] = {}
         pose = try_as
     else:
         if material.get("serials") is None:
             material['serials'] = {}
-    prev_cells = material["serials"].get(pose)
+    prev_cells = material['serials'].get(pose)
     if prev_cells is None:
-        material["serials"][pose] = cells
+        material['serials'][pose] = cells
     else:
-        material["serials"][pose].extend(cells)
+        material['serials'][pose].extend(cells)
 
     # prev_sprite = material['tmp']['sprites'].get(pose)
     w, h = tilesets[path]['tile_size']
@@ -1655,8 +1734,8 @@ def _load_sprite(what, cells, order=None, gettable=True,
 
     if material.get('default_pose') is None:
         material['default_pose'] = pose
-    material["overlayable"] = overlayable
-    material["biome"] = biome
+    material['overlayable'] = overlayable
+    material['biome'] = biome
     surf = file_surfs.get(path)
     if surf is None:
         surf = pg.image.load(path)  # .convert_alpha()
@@ -1904,7 +1983,7 @@ def get_gobs_at(loc):
     result = None
     # sk for spatial key
     sk = str(loc[0])+","+str(loc[1])
-    raise NotImplementedError("NYI")
+    raise NotImplementedError("")
     return result
 
 

@@ -24,7 +24,6 @@ setup(name='mgep',
       install_requires=[
           'pygame',
       ],
-      # data_files=list(examples.items()),
       test_suite='nose.collector',
       tests_require=['nose', 'nose-cover3'],
       entry_points={
