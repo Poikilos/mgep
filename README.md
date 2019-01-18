@@ -3,14 +3,70 @@ Minimal Game Engine for Pygame - More Assumptions, Less Typing
 ![screenshot](https://raw.githubusercontent.com/poikilos/mgep/master/screenshot.jpg)
 This demo is possible using 1 printable page of code in 10pt font
 
-## Authors
-* angles.py by phn on GitHub
-  <https://gist.github.com/phn/1111712/35e8883de01916f64f7f97da9434622000ac0390>
-* for media, see *CREDITS and Attribution text files in media folders
-* all other work by poikilos (Jake Gustafson) unless noted alongside
-  work such as in code comments
 
-## Primary Features
+## Installation
+* pip install https://github.com/poikilos/mgep/zipball/master
+  (or place the mgep/mgep folder in the directory of your project)
+
+## Usage
+* `from mgep import *`
+* for more information, see example*.py
+  * if you don't want the player to be able to use the F3 key, or any
+    other engine hotkey: handle the key before `else` in keydown case.
+    To eliminate use of all engine hotkeys, simply don't call
+    `default_keydown`.
+
+### Guiding Principles
+mgep is intended for novices, elementary learners, and anyone who wants
+to focus on the game creation process after writing few lines of code.
+mgep allows you to create a game with the fewest lines possible by
+making helpful assumptions.
+
+
+### Helpful Assumptions
+* loading a tileset makes a top view game
+* adding sprites by col, row uses last loaded tileset
+* walk speed based on real life: 2 meters per second, in 3 steps (such
+  as left, right, left)
+  --so delay_count is 20, so that sprite animations will always be 3 FPS
+  (which is good for for sprite sheets with 3-frame
+  [left, middle, right] animations, such as so-called "3x4"
+  sprite sheets with `order=[1,2,1,3]`)
+* if you do move_y by positive number, and have loaded a pose called
+  'walk.down', then the sprite's pose will be set to 'walk.down'
+* if you add a material more than once it will be more common
+* if you run `stop_unit`, idle animation will be used, and if 'idle' key
+  is not in `materials[sprite[what]]['tmp']['sprites']` dictionary, then
+  `sprite['animate']` will be set to `False`.
+  * keeps track of facing direction (if move_x and move_y are used) and
+    look for 'idle.left' etc and only
+    use 'idle' if no matching directional idle sprite key is found
+* if you check what key is pressed you can call
+  `default_keydown(event)` (potentially in an `else` clause) to get some
+  useful debugging keys when using a keyboard (F3: visual debug; arrow
+  keys: explore tilesets)
+  * similar usage applies to calling:
+    * (`if event.MOUSEBUTTONDOWN:`) `default_down`
+    * (`if event.MOUSEBUTTONUP:`) `default_up`
+    * (`if event.MOUSEMOTION:`) `default_motion`
+* Generates normal map and mesa alpha from built-in terrain cutouts
+* player has inventory
+  * `set_unstackable` makes an item require a separate inventory slot
+    * Only items that are unstackable are actually
+      stored with all of their data in unit['items'] list of node dicts.
+      Otherwise items are stored as a "material" in
+      unit['materials'] dict where key is what, and value is a count
+      (displayed in order of unit['material_slots'] string list).
+  * `push_unit_item` adds an item to a unit's inventory
+  * `pop_unit_what_item` gets certain type of item and removes it from
+    unit's inventory
+  * `pop_unit_item` gets item unit has selected, and removes it from
+    unit's inventory
+* `place_character` automatically loads file `name + ".json"` if
+  present (present if you previously ran the program and have done
+  `save(name, get_unit(name))` such as at end of program)
+
+### Primary Features
 * procedural:
   * less typing is required
   * any save method that takes dictionary can save game data
@@ -21,6 +77,7 @@ This demo is possible using 1 printable page of code in 10pt font
   call to load_tileset
 * framerate-independent sprite animation
 * 3D metric positioning and physics
+
 
 ## Issues
 ~: low-priority enhancement\
@@ -60,39 +117,14 @@ This demo is possible using 1 printable page of code in 10pt font
 * (~) possibly switch to pypy-pygame for JavaScript support
 * (~) surfaces that affect physics: slippery, bouncy
 
-## Directives
-mgep is intended for novices, elementary learners, and anyone who wants
-to focus on the game creation process after writing few lines of code.
-mgep allows you to create a game with the fewest lines possible by
-making helpful assumptions.
 
-## Usage
-* place the mgep folder in the directory of your project
-* `from mgep import *`
-* for more information, see example*.py
-  * if you don't want the player to be able to use the F3 key, or any
-    other engine hotkey: handle the key before `else` in keydown case.
-    To eliminate use of all engine hotkeys, simply don't call
-    `other_keydown`.
+## Authors
+* angles.py by phn on GitHub
+  <https://gist.github.com/phn/1111712/35e8883de01916f64f7f97da9434622000ac0390>
+* for media, see *CREDITS and Attribution text files in media folders
+* all other work by poikilos (Jake Gustafson) unless noted alongside
+  work such as in code comments
 
-## Helpful Assumptions
-* loading a tileset makes a top view game
-* adding sprites by row, col uses last loaded tileset
-* walk speed based on real life: 2 meters per second, in 3 steps (such
-  as left, right, left)
-  --so delay_count is 20, so that sprite animations will always be 3 FPS
-  (which is good for for sprite sheets with 3-frame
-  [left, middle, right] animations, such as so-called "3x4"
-  sprite sheets with `order=[1,2,1,3]`)
-* if you do move_y by positive number, and have loaded a pose called
-  'walk.down', then the sprite's pose will be set to 'walk.down'
-* if you add a material more than once it will be more common
-* if you run `stop_unit`, idle animation will be used, and if 'idle' key
-  is not in `materials[sprite[what]]['tmp']['sprites']` dictionary, then
-  `sprite['animate']` will be set to `False`.
-  * keeps track of facing direction (if move_x and move_y are used) and
-    look for 'idle.left' etc and only
-    use 'idle' if no matching directional idle sprite key is found
 
 ## License
 * License for media is CC0 unless otherwise specified in folders (you
@@ -103,8 +135,7 @@ https://github.com/poikilos/mgep/blob/master/LICENSE
 
 ## Developer Notes:
 * run tests:
-```
-
+```bash
 if [ -f "`command -v outputinspector`" ]; then
   nosetests 1>out.txt 2>err.txt
   outputinspector
@@ -145,11 +176,16 @@ fi
     precise sizes shown by the dump_internal methods.
     The included maps (in maps/mesa) use 116x82 tiles.
 * world spec:
-  * world is a dict where key is a location such as '0,0' and value is a list.
+  * world['gravity'] is a float in meters per second squared
+  * world['blocks'] is a dict where key is a location such as '0,0'
+    and each value is a list.
     * each list contains nodes
       * each node is a dict with 'what' and 'pose' strings
         where node['what'] is a material key and node['pose'] is a key
         for the material[node['what']]['tmp']['sprites'] dictionary.
+  * world['tmp']['blocks'] holds locations of sprites for fast z-order:
+    * world['tmp']['blocks'][key]['nodes'] is a list of nodes
+      (see node format above)
 
 * variable naming:
   * _mps: meters per second
@@ -164,9 +200,10 @@ fi
 * optional unit values (to override defaults):
   * `'max_land_mps'`: maximum meters per second land speed
   * `'max_land_accel'`: maximum meters per second squared land speed
-* col,row (y,x) order is ONLY used for referring to frames in a sprite
-  sheet, and is always starting at 1,1 (which is at pixel position 0,0)
-* loc or location (col,row format NOT row,col ) is always a cell
+* col,row (x, y, formerly row, col = y, x) order is used for referring
+  to frames in a sprite sheet, and is always starting at 1,1 (which is
+  at pixel position 0,0)
+* loc or location (col, row format NOT row, col ) is always a cell
   location in the world database
 * pos is a pixel location in the world (NOT on the screen generally)
 * what SpriteSheet calls ticks is actually a frame count which
@@ -198,3 +235,33 @@ fi
     * then get the filename from the blob hash same as further up (in
       this example, the corresponding pack file is
       "sounds/jute-dh-rpgsounds/fire_2.wav")
+* mesa maps
+  * normal maps are generated (is standard normal map, so normal map RGB maps to XYZ, Z <= 0, and Z >= -1 where -1 faces light source for easy math [brightest when light vector and normal vector are coincident])
+* Py4a vs Kivy's python-for-android vs pgs4a
+  * Ways to run python on android:
+    (https://en.wikibooks.org/wiki/Android/Kivy)
+  * Py4a is successor to [pgs4a](https://launchpad.net/pgs4a)
+  * pgs4a (http://pygame.renpy.org/) now points to
+    <https://github.com/renpytom/rapt-pygame-example>
+    (renpy is a visual novel engine, but github.com/renpy also holds:
+    pygame_sdl2)
+    * requires "JDK in the path, and Python 2.7 installed"
+      (both 64-bit or both 32-bit)
+    * import like:
+```
+try:
+    import pygame_sdl2
+    pygame_sdl2.import_as_pygame()
+except ImportError:
+    pass
+```
+  * "SL4A lets you run python scripts on android. Their PY4A is a step
+    in their toolchain"
+    - inclement
+    "Kivy's python-for-android is more actively developed than
+    SL4A(ASE)'s Py4A"
+    - GozzoMan
+    <https://stackoverflow.com/questions/18478492/difference-between-kivy-and-py4a>
+  * Question about pgs4a on
+    <http://forums.devshed.com/python-programming/976793-pgs4a-post2974402.html>
+    is unanswered.
