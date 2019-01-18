@@ -94,6 +94,8 @@ making helpful assumptions.
     guestures)
   * `button[x]['swiped']` is True if drag was already processed as a
     gesture.
+  * `button[x]['release']` is True if is an "UP" event
+    (end of click/touch/drag)
 * keeps track of mouse drag to interpret swipes, so mouse event (named
   `e` in the handlers) contains the following dictionary keys:
   * `e['state']` is a dict which is same as `button[x]` above.

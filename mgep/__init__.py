@@ -1137,8 +1137,6 @@ def move_direction(name, direction, z=None):
             unit['tmp']['move_multipliers'][0] = deltas[0]
             unit['tmp']['move_multipliers'][1] = z
             unit['tmp']['move_multipliers'][2] = deltas[2]
-            print("  deltas: " + str(deltas))
-            print("  direction: " + str(direction))
         else:
             print(str(direction) + " is not a known direction.")
     else:
@@ -2691,11 +2689,7 @@ def on_interact_far(e):
         long_press = False
     sk = e.get('spatial_key')
     pos = e.get('spatial_pos')
-    new_press = e['state']['new_press']
-    if new_press:
-        print("on_interact_far:")
-        print("  key: " + str(e['spatial_key']))
-
+    # new_press = e['state']['new_press']
     unit = e['unit']
     delta = (
         pos[0] - unit['pos'][0],
@@ -2734,29 +2728,21 @@ def on_tapped_node(e):
 def _on_interact_near(e):
     """only fires if not on gui"""
     # print("_on_interact_near:")
-    if e.get('release') is True:
-        print("_on_interact_near:")
-        print("  # released")
     long_press = e.get('long_press')
     if long_press is None:
         long_press = False
     sk = e.get('spatial_key')
-    new_press = e['state']['new_press']
+    # new_press = e['state']['new_press']
     unit = e.get('unit')
     if unit is not None:
         if long_press:
             pit = unit['tmp']['prev_interact_ticks']
             since_prev_ms = pg.time.get_ticks() - pit
             if since_prev_ms >= unit['interact_ms']:
-                print("_on_interact_near:")
-                print("  long_press: True")
                 on_pushed_node(e)
                 unit['tmp']['prev_interact_ticks'] = pg.time.get_ticks()
         else:
-            if e.get('release') is True:
-                print("_on_interact_near:")
-                print("  # tap")
-                print("  key: " + e['spatial_key'])
+            if e['state']['release']:
                 on_tapped_node(e)
 
 
@@ -2799,13 +2785,11 @@ def _check_swipe(screen, e):
     return ret
 
 def _on_swipe_angle(e):
-    # print("_on_swipe_angle: " + fmt_f(e['angle_deg']))
     for f in bindings['swipe_angle']:
         f(e)
 
 
 def _on_swipe_direction(e):
-    print("_on_swipe_direction: " + e['direction'])
     for f in bindings['swipe_direction']:
         f(e)
 
@@ -2827,8 +2811,6 @@ def get_touch():
         press_ms = pg.time.get_ticks() - buttons[1]['start_ticks']
         if press_ms > settings['long_press_ms']:
             e['long_press'] = True
-        if buttons[1].get('release') is True:
-            e['release'] = True
         e['unit_name'] = player_unit_name
         # if player_unit_name is not None:
             # unit_loc = get_unit_location(player_unit_name)
@@ -2845,11 +2827,12 @@ def _process_touch(screen):
     """
     e = get_touch()
     if e is not None:
+        new_press = e['state']['new_press']
         act_enable = True
         if screen is not None:
             for widget in widgets:
                 if is_in_widget(screen, widget, e['state']['pos']):
-                    if e.get('new_press') is True:
+                    if new_press:
                         e['widget'] = widget
                         on_widget_click(e)
                         # del e['widget']
@@ -2874,7 +2857,7 @@ def _process_touch(screen):
                 e['far'] = False
                 if act_enable:
                     _on_interact_near(e)
-            if buttons[1].get('release') is True:
+            if e['state']['release'] is True:
                 unit['tmp']['move_multipliers'][0] = 0.0
                 unit['tmp']['move_multipliers'][2] = 0.0
                 buttons[1] = None  # ok since done _on_interact_near
@@ -2901,7 +2884,8 @@ def default_down(event):
         'pos': event.pos,
         'new_press': True,
         'points': [event.pos],
-        'swiped': False
+        'swiped': False,
+        'release': False
     }
     if button == 4:
         inventory_scroll(-1)
