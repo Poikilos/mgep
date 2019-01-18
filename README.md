@@ -77,7 +77,47 @@ making helpful assumptions.
   call to load_tileset
 * framerate-independent sprite animation
 * 3D metric positioning and physics
+* percentage-based widget system that adapts to screen resolution
+  changes instantly (pos and size are multiplied by screen size)
+* Swipe events (simple angle only) are detected if swipe is as long as
+  `settings['swipe_multiplier'] * short_px` where short_px is shorter
+  dimension of screen detected.
 
+### API Notes
+* Settings should only be changed by editing "settings-mgep.json" after
+  first run (including test run on developer's computer; or if you can
+  write json yourself, make your own and mgep will automatically add any
+  settings not present there)
+* keeps track of mouse button data:
+  * `button[1]` is dictionary with button data if left mouse button is
+    pressed (also reserved for touch and serves as basis for touch
+    guestures)
+  * `button[x]['swiped']` is True if drag was already processed as a
+    gesture.
+* keeps track of mouse drag to interpret swipes, so mouse event (named
+  `e` in the handlers) contains the following dictionary keys:
+  * `e['state']` is a dict which is same as `button[x]` above.
+  * See `def default_down` for other keys.
+  * `on_tapped_node` occurs when time is shorter than
+    `on_pushed_node` occurs otherwise.
+* bind to events: `bind(name, function)` where function
+  takes event dictionary (`e` in examples below) and name is:
+  * 'draw_ui': `e['screen']` is the screen
+  * 'swipe_angle': `e['angle']` is in degrees, `e['angle_rad']` in
+    radians (also has mouse data)
+  * 'swipe_direction': `e['direction']` is 'up', 'down', 'left', or
+    'right' (also has 'swipe_angle' data above)
+  * You can create an invisible jump button on the upper right quadrant
+    of the screen:
+```
+def player_unit_jump(e):
+    if not unit_jump(player_name, 5):
+        show_popup("cannot jump while airborne")
+
+
+add_widget((.5, 0), (.5, .5), f=player_unit_jump)
+
+```
 
 ## Issues
 ~: low-priority enhancement\

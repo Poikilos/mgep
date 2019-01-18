@@ -65,9 +65,14 @@ npc_name = 'Stella'
 place_character('male', player_name, (0, 0))
 place_character('female', npc_name, (2, 0))
 
+def swipe_direction(e):
+    move_direction(player_name, e['direction'])
+    unit_jump(player_name, 5)
+
 set_visual_debug(True)
 
 # bind('draw_ui', on_draw_ui)
+bind('swipe_direction', swipe_direction)
 resize_count = 0
 while not done:
     for event in pg.event.get():

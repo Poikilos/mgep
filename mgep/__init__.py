@@ -100,8 +100,158 @@ popup_alpha = 0
 visual_debug_enable = False
 bindings = {}
 bindings['draw_ui'] = []
+bindings['swipe_direction'] = []
+bindings['swipe_angle'] = []
 nothing_y = -10.0
 checkerboard = {}
+widgets = []
+
+named_delta_vec2s = {}
+named_delta_vec2s['e'] = [1, 0]
+named_delta_vec2s['n'] = [0, 1]
+named_delta_vec2s['w'] = [-1, 0]
+named_delta_vec2s['s'] = [0, -1]
+named_delta_vec2s['east'] = named_delta_vec2s['e']
+named_delta_vec2s['north'] = named_delta_vec2s['n']
+named_delta_vec2s['west'] = named_delta_vec2s['w']
+named_delta_vec2s['south'] = named_delta_vec2s['s']
+named_delta_vec2s['right'] = named_delta_vec2s['e']
+named_delta_vec2s['up'] = named_delta_vec2s['n']
+named_delta_vec2s['left'] = named_delta_vec2s['w']
+named_delta_vec2s['down'] = named_delta_vec2s['s']
+
+named_delta_vec3s = {}
+named_delta_vec3s['e'] = [1.0, 0.0, 0.0]
+named_delta_vec3s['n'] = [0.0, 0.0, 1.0]
+named_delta_vec3s['w'] = [-1.0, 0.0, 0.0]
+named_delta_vec3s['s'] = [0.0, 0.0, -1.0]
+named_delta_vec3s['east'] = named_delta_vec3s['e']
+named_delta_vec3s['north'] = named_delta_vec3s['n']
+named_delta_vec3s['west'] = named_delta_vec3s['w']
+named_delta_vec3s['south'] = named_delta_vec3s['s']
+named_delta_vec3s['right'] = named_delta_vec3s['e']
+named_delta_vec3s['up'] = named_delta_vec3s['n']
+named_delta_vec3s['left'] = named_delta_vec3s['w']
+named_delta_vec3s['down'] = named_delta_vec3s['s']
+
+def add_widget(pos, size, text=None, surface=None, section="main",
+               text_pos=None, font_aa=True, font_color=(255, 255, 255),
+               font_name=None, font_size=None, border_color=None,
+               auto_add=True, f=None, f_params_dict=None):
+    """completely ratio-based positioning and sizing
+    for example, if pos = (0, .9) and size = (.25, .1)
+    then widget will touch bottom left and be 25% of screen width by
+    10% of screen height.
+
+    Sequential arguments:
+    pos -- multipliers for position
+    size -- multipliers for size
+
+    Keyword arguments:
+    text -- what widget will say, if anything
+    surface -- image that will replace border, if any
+    text_pos -- center of text relative to widget, multiplied by
+                width of both
+                (default: (0,0); (0,0): center; (-1,0): outside left)
+    border_color -- color for border (None: no border)
+    f -- the function to call (must accept param e for event dict)
+    f_params_dict -- the dict to send as e['custom']
+    """
+    if text_pos is None:
+        text_pos = (0.0, 0.0)
+    widget = {}
+    widget['pos'] = pos
+    widget['size'] = size
+    widget['text'] = text
+    widget['surface'] = surface
+    widget['section'] = section
+    widget['text_pos'] = text_pos
+    widget['border_color'] = border_color
+    widget['f'] = f
+    widget['f_params_dict'] = f_params_dict
+    widget['tmp'] = {}
+    if font_size is None:
+        font_size = settings['sys_font_size']
+    if font_name is None:
+        font_name = settings['sys_font_name']
+    if text is not None:
+        aa = font_aa
+        font = pg.font.SysFont(font_name, font_size)
+        widget['tmp']['text_surf'] = font.render(text, aa, font_color)
+    widget['section'] = section
+    if auto_add:
+        widgets.append(widget)
+    return widget
+
+
+def get_px_from_multipliers(screen, multipliers):
+    w, h = screen.get_size()
+    return (
+        round(multipliers[0] * float(w)),
+        round(multipliers[1] * float(h))
+    )
+
+
+def is_in_widget(screen, widget, px_vec2):
+    pos_px = get_px_from_multipliers(screen, widget['pos'])
+    size_px = get_px_from_multipliers(screen, widget['size'])
+    rect = pg.Rect(pos_px, size_px)
+    return rect.collidepoint(px_vec2)
+
+
+def render_widget(screen, widget):
+    surf = screen
+    win_size = screen.get_size()
+    w, h = win_size
+    text_surf = widget['tmp'].get('text_surf')
+    border_color = widget.get('border_color')
+    pos_px = get_px_from_multipliers(screen, widget['pos'])
+    size_px = get_px_from_multipliers(screen, widget['size'])
+    center_px = (
+        pos_px[0] + round(size_px[0] / 2.0),
+        pos_px[1] + round(size_px[1] / 2.0)
+    )
+    if text_surf is not None:
+        text_pos = widget.get('text_pos')
+        text_size_px = text_surf.get_size()
+        pusher = (
+            text_size_px[0] + size_px[0],
+            text_size_px[1] + size_px[1]
+        )
+        # pusher is used so -1 is outside left and 1 is outside right
+        text_center_px = (
+            center_px[0] + round(pusher[0] * text_pos[0]),
+            center_px[1] + round(pusher[1] * text_pos[1])
+        )
+        # round for python2 instead of // floor division:
+        text_pos_px = (
+            text_center_px[0] - round(text_size_px[0] / 2),
+            text_center_px[1] - round(text_size_px[1] / 2)
+        )
+        screen.blit(text_surf, text_pos_px)
+    border_color = widget.get('border_color')
+    if border_color is not None:
+        short_px = min(win_size[0], win_size[1])
+        psd = get_setting('point_size_divisor')
+        # cast at least one to float for python 2:
+        thickness = round(short_px / float(psd))
+        if thickness < 1:
+            thickness = 1
+        pg.draw.rect(
+            screen,
+            border_color,
+            pg.Rect(pos_px, size_px),
+            thickness
+        )
+
+
+def on_widget_click(e):
+    widget = e['widget']
+    if widget['f'] is not None:
+        if widget['f_params_dict'] is not None:
+            e['custom'] = widget['f_params_dict']
+        widget['f'](e)
+
 
 def draw_ui(e):
     surf = e.get('screen')
@@ -109,7 +259,7 @@ def draw_ui(e):
     inv_cursor_max = None
     material_slots = None  # keys for unit['materials'] dict
     name = get_player_unit_name()
-    inv_cursor_i = None
+    selected_slot = None
     if (name is not None):
         unit = get_unit(name)
         if unit is not None:
@@ -123,10 +273,10 @@ def draw_ui(e):
                 items = []
                 unit['items'] = items
             inv_cursor_max = len(items) + len(material_slots)
-            inv_cursor_i = get_unit_value(name, 'inv_cursor_i')
-            if inv_cursor_i is None:
-                inv_cursor_i = 0
-                set_unit_value(name, 'inv_cursor_i', inv_cursor_i)
+            selected_slot = get_unit_value(name, 'selected_slot')
+            if selected_slot is None:
+                selected_slot = 0
+                set_unit_value(name, 'selected_slot', selected_slot)
 
     if surf is not None:
         win_size = surf.get_size()
@@ -170,7 +320,7 @@ def draw_ui(e):
                 what = items[slot_i]['what']
                 pose = items[slot_i].get('pose')
 
-            if theoretical_i == inv_cursor_i:
+            if theoretical_i == selected_slot:
                 color = select_color
             else:
                 color = this_color
@@ -320,7 +470,7 @@ settings['text_antialiasing'] = got.get('text_antialiasing', True)
 settings['human_run_slow_mps'] = got.get('human_run_slow_mps', 4.47)
 """4.47 m/s = 10 miles per hour"""
 settings['human_walk_mps'] = got.get('human_walk_mps', 3.0)  # approx
-settings['human_walk_accel'] = got.get('human_walk_accel', 3.0)
+settings['human_walk_accel'] = got.get('human_walk_accel', 12.0)
 """approx"""
 settings['human_run_mps'] = got.get('human_run_mps', 6.7)
 """6.7 m/s = 15 miles per hour"""
@@ -329,6 +479,7 @@ settings['human_run_max_mps'] = got.get('human_run_max_mps', 12.4)
 """12.4 m/s = 27.8 miles per hour"""
 settings['sys_font_name'] = got.get('sys_font_name', 'Arial')
 settings['sys_font_size'] = got.get('sys_font_size', 12)
+settings['swipe_multiplier'] = got.get('swipe_multiplier', .2)
 """pygame only accepts int"""
 settings['default_world_gravity'] = got.get('default_world_gravity',
                                             9.8)
@@ -726,6 +877,7 @@ def vec2_from_vec3_via_camera(vec3, cam_vec2=None):  # src_size,
     y += -vec3[1] * block_rise_as_y_px
     return (x, y)
 
+
 def get_target_location():
     unit = units[player_unit_name]
     target = get_unit_crosshairs_vec3(unit)
@@ -807,8 +959,10 @@ def push_unit_item(name, item):
             units[name]['items'] = items
         items.append(item)
 
+
 def get_unit(name):
     return units.get(name)
+
 
 def get_all_slots_count(name):
     inv_cursor_max = None
@@ -825,15 +979,16 @@ def get_all_slots_count(name):
                 items = []
                 unit['items'] = items
             inv_cursor_max = len(items) + len(material_slots)
-            inv_cursor_i = get_unit_value(name, 'inv_cursor_i')
-            if inv_cursor_i is None:
-                inv_cursor_i = 0
-                set_unit_value(name, 'inv_cursor_i', inv_cursor_i)
+            selected_slot = get_unit_value(name, 'selected_slot')
+            if selected_slot is None:
+                selected_slot = 0
+                set_unit_value(name, 'selected_slot', selected_slot)
     return inv_cursor_max
+
 
 def get_what_unit_wielding(name):
     ret = None
-    inv_cursor_i = None
+    selected_slot = None
     if (name is not None):
         unit = get_unit(name)
         if unit is not None:
@@ -847,17 +1002,18 @@ def get_what_unit_wielding(name):
                 items = []
                 unit['items'] = items
             inv_cursor_max = len(items) + len(material_slots)
-            inv_cursor_i = get_unit_value(name, 'inv_cursor_i')
-            if inv_cursor_i is None:
-                inv_cursor_i = 0
-                set_unit_value(name, 'inv_cursor_i', inv_cursor_i)
-    if inv_cursor_i >= len(items):
-        if inv_cursor_i < len(material_slots):
-            ret = material_slots[inv_cursor_i]
+            selected_slot = get_unit_value(name, 'selected_slot')
+            if selected_slot is None:
+                selected_slot = 0
+                set_unit_value(name, 'selected_slot', selected_slot)
+    if selected_slot >= len(items):
+        if selected_slot < len(material_slots):
+            ret = material_slots[selected_slot]
     else:
         if len(items) > 0:
-            ret = items[inv_cursor_i]['what']
+            ret = items[selected_slot]['what']
     return ret
+
 
 def pop_unit_item(name):
     result = None
@@ -963,6 +1119,30 @@ def move_x(name, amount):
         raise ValueError("Cannot move since no unit '" +
                          name + "'")
 
+
+def move_direction(name, direction, z=None):
+    """Move in a direction.
+
+    Sequential arguments:
+    direction -- must be 'up', 'down', 'left', 'right',
+                 'N', 'S', 'E', 'W', 'north', 'south', 'east', 'west'
+                 (case insensitive)
+    """
+    deltas = named_delta_vec3s.get(direction.lower())
+    unit = units.get(name)
+    if unit is not None:
+        if deltas is not None:
+            if z is None:
+                z = unit['tmp']['move_multipliers'][1]
+            unit['tmp']['move_multipliers'][0] = deltas[0]
+            unit['tmp']['move_multipliers'][1] = z
+            unit['tmp']['move_multipliers'][2] = deltas[2]
+            print("  deltas: " + str(deltas))
+            print("  direction: " + str(direction))
+        else:
+            print(str(direction) + " is not a known direction.")
+    else:
+        print(str(name) + " is not the name of a character/other unit.")
 
 def move_y(name, amount):
     unit = units.get(name)
@@ -1460,6 +1640,7 @@ def draw_frame(screen):
     else:
         diameter = round(diameter)
     target_size = (diameter, diameter)
+    target_enable = True
     block_aspect = math.sqrt(2.0) / 2.0
     """perspective for camera 45 degrees downward"""
     ideal_min_m = 11
@@ -1565,10 +1746,18 @@ def draw_frame(screen):
     camera_px = (int(camera['pos'][0] * scaled_b_size[0]),
                  int(camera['pos'][2] * scaled_b_size[1]))
 
-    e = process_touch()
+    e = _process_touch(screen)
+    if e is not None:
+        if e.get('ignore') is True:
+            e = None
     sel_key = None
     # blue cube for selection
-    sel_color = (60, 90, 225)
+    reachable_color = (60, 90, 225)
+    sel_color = (200, 200, 128)
+    if e is not None:
+        if not e['far']:
+            sel_color = reachable_color
+
     sel_low_color = (
         round(sel_color[0]/2),
         round(sel_color[1]/2),
@@ -1665,6 +1854,7 @@ def draw_frame(screen):
                         scaled_b_size[1]),
                 sel_thickness
             )
+            target_enable = False
         for unit_name, unit in prev_units.items():
             render_unit(screen, unit_name, unit, sprite_scale,
                         camera_vec2=camera_px)
@@ -1903,32 +2093,56 @@ def draw_frame(screen):
                 #           fmt_vec(unit['pos'], places=places))
                 push_text("  moved_vec3:" +
                           fmt_vec(moved_vec3, places=places))
-            target = get_unit_crosshairs_vec3(unit)
-            x, y = vec2_from_vec3_via_camera(target, cam_vec2=camera_px)
-            color = (200, 10, 0)
-            thin = round(thickness/2.0)
-            if thin < 1:
-                thin = 1
-            border_size = (
-                target_size[0] + thickness,
-                target_size[1] + thickness
-            )
-            pg.draw.rect(
-                screen,  # scalable_surf,
-                (color[0]/2, color[1]/2, color[2]/2),
-                pg.Rect(x-round(float(target_size[0])/2.0)-thin,
-                        y-round(float(target_size[1])/2.0)-thin,
-                        border_size[0],
-                        border_size[1])
-            )
-            pg.draw.rect(
-                screen,  # scalable_surf,
-                color,
-                pg.Rect(x-round(float(target_size[0])/2.0),
-                        y-round(float(target_size[1])/2.0),
-                        target_size[0],
-                        target_size[1])
-            )
+            if target_enable:
+                target = get_unit_crosshairs_vec3(unit)
+                x, y = vec2_from_vec3_via_camera(target,
+                                                 cam_vec2=camera_px)
+                # color = (200, 10, 0)  # red target
+                color = reachable_color
+                thin = round(thickness/2.0)
+                if thin < 1:
+                    thin = 1
+                border_size = (
+                    target_size[0] + thickness,
+                    target_size[1] + thickness
+                )
+                # dark red outline
+                # pg.draw.rect(
+                    # screen,  # scalable_surf,
+                    # (color[0]/2, color[1]/2, color[2]/2),
+                    # pg.Rect(x-round(float(target_size[0])/2.0)-thin,
+                            # y-round(float(target_size[1])/2.0)-thin,
+                            # border_size[0],
+                            # border_size[1])
+                # )
+                # dark red cross
+                border_size = target_size[0] * 2, target_size[1]
+                pg.draw.rect(
+                    screen,  # scalable_surf,
+                    (color[0]/2, color[1]/2, color[2]/2),
+                    pg.Rect(x-round(float(target_size[0])/2.0)-thin,
+                            y-round(float(target_size[1])/2.0)-thin,
+                            border_size[0],
+                            border_size[1])
+                )
+                border_size = target_size[0], target_size[1] * 2
+                pg.draw.rect(
+                    screen,  # scalable_surf,
+                    (color[0]/2, color[1]/2, color[2]/2),
+                    pg.Rect(x-round(float(target_size[0])/2.0)-thin,
+                            y-round(float(target_size[1])/2.0)-thin,
+                            border_size[0],
+                            border_size[1])
+                )
+                # red dot
+                pg.draw.rect(
+                    screen,  # scalable_surf,
+                    color,
+                    pg.Rect(x-round(float(target_size[0])/2.0),
+                            y-round(float(target_size[1])/2.0),
+                            target_size[0],
+                            target_size[1])
+                )
 
     if (popup_surf is None) or (popup_showing_text != popup_text):
         if popup_text is not None:
@@ -1938,7 +2152,8 @@ def draw_frame(screen):
             )
             popup_shadow_surf = default_font.render(popup_text,
                                                     False, (0, 0, 0))
-            popup_sec = settings["popup_sec_per_glyph"] * len(popup_text)
+            pspg = settings["popup_sec_per_glyph"]
+            popup_sec = pspg * len(popup_text)
             popup_alpha = 255
             settings["popup_sec_per_character"] = .04
         else:
@@ -2452,20 +2667,19 @@ def set_player_unit_name(name):
 def inventory_scroll(amount):
     name = player_unit_name
     if name is not None:
-        inv_cursor_i = get_unit_value(name, 'inv_cursor_i')
+        selected_slot = get_unit_value(name, 'selected_slot')
         inv_cursor_max = get_all_slots_count(name)
-        if inv_cursor_i is None:
-            inv_cursor_i = 0
-        inv_cursor_i += amount
-        if inv_cursor_i < 0:
-            inv_cursor_i = inv_cursor_max + inv_cursor_i
-        if inv_cursor_i >= inv_cursor_max:
+        if selected_slot is None:
+            selected_slot = 0
+        selected_slot += amount
+        if selected_slot < 0:
+            selected_slot = inv_cursor_max + selected_slot
+        if selected_slot >= inv_cursor_max:
             if inv_cursor_max > 0:
-                inv_cursor_i %= inv_cursor_max
+                selected_slot %= inv_cursor_max
             else:
-                inv_cursor_i = 0
-        set_unit_value(name, 'inv_cursor_i', inv_cursor_i)
-
+                selected_slot = 0
+        set_unit_value(name, 'selected_slot', selected_slot)
 
 buttons = [None, None, None, None, None, None, None, None]
 
@@ -2477,8 +2691,8 @@ def on_interact_far(e):
         long_press = False
     sk = e.get('spatial_key')
     pos = e.get('spatial_pos')
-    new_press = e.get('new_press')
-    if new_press is True:
+    new_press = e['state']['new_press']
+    if new_press:
         print("on_interact_far:")
         print("  key: " + str(e['spatial_key']))
 
@@ -2510,35 +2724,37 @@ def on_pushed_node(e):
     if item is not None:
         push_unit_item(player_unit_name, item)
 
+
 def on_tapped_node(e):
     item = pop_unit_item(player_unit_name)
     if item is not None:
         push_node(e.get('spatial_key'), item)
 
-def on_interact_near(e):
+
+def _on_interact_near(e):
     """only fires if not on gui"""
-    # print("on_interact_near:")
+    # print("_on_interact_near:")
     if e.get('release') is True:
-        print("on_interact_near:")
+        print("_on_interact_near:")
         print("  # released")
     long_press = e.get('long_press')
     if long_press is None:
         long_press = False
     sk = e.get('spatial_key')
-    new_press = e.get('new_press')
+    new_press = e['state']['new_press']
     unit = e.get('unit')
     if unit is not None:
         if long_press:
             pit = unit['tmp']['prev_interact_ticks']
             since_prev_ms = pg.time.get_ticks() - pit
             if since_prev_ms >= unit['interact_ms']:
-                print("on_interact_near:")
+                print("_on_interact_near:")
                 print("  long_press: True")
                 on_pushed_node(e)
                 unit['tmp']['prev_interact_ticks'] = pg.time.get_ticks()
         else:
             if e.get('release') is True:
-                print("on_interact_near:")
+                print("_on_interact_near:")
                 print("  # tap")
                 print("  key: " + e['spatial_key'])
                 on_tapped_node(e)
@@ -2550,16 +2766,63 @@ def distance_planar(pos1, pos2, planar_coord=2):
     return math.sqrt((x2-x1)**2+(y2-y1)**2)
 
 
+def _check_swipe(screen, e):
+    ret = False
+    if e['state']['swiped']:
+        return False
+    if screen is not None:
+        w, h = screen.get_size()
+        short_px = min(w, h)
+        min_px = round(settings['swipe_multiplier'] * float(short_px))
+        points = e['state']['points']
+        if len(points) > 1:
+            start_pos = points[0]
+            end_pos = points[len(points)-1]
+            delta = end_pos[0] - start_pos[0], end_pos[1] - start_pos[1]
+            dist = round(math.sqrt(delta[0]**2 + delta[1]**2))
+            if dist >= min_px:
+                # invert y since screen is inverse cartesian
+                e['angle_rad'] = math.atan2(-delta[1], delta[0])
+                e['angle'] = math.degrees(e['angle_rad'])
+                _on_swipe_angle(e)
+                if e['angle'] < -135 or e['angle'] > 135:
+                    e['direction'] = 'left'
+                elif e['angle'] < -45:
+                    e['direction'] = 'down'
+                elif e['angle'] < 45:
+                    e['direction'] = 'right'
+                else:
+                    e['direction'] = 'up'
+                _on_swipe_direction(e)
+                e['state']['swiped'] = True
+
+    return ret
+
+def _on_swipe_angle(e):
+    # print("_on_swipe_angle: " + fmt_f(e['angle_deg']))
+    for f in bindings['swipe_angle']:
+        f(e)
+
+
+def _on_swipe_direction(e):
+    print("_on_swipe_direction: " + e['direction'])
+    for f in bindings['swipe_direction']:
+        f(e)
+
+
 def get_touch():
+    """Returns touch event (`e` in examples below) including
+    e['state']: the mouse button or touch state
+    """
     e = None
-    if player_unit_name is None:
-        return e
+    # if player_unit_name is None:
+        # return e
     if buttons[1] is not None:
         e = {}
+        e['state'] = buttons[1]
         # for k, v in buttons[1].items()
             # if k != 'pos':
                 # e[k] = v
-        e['vec2'] = buttons[1]['pos']
         e['long_press'] = False
         press_ms = pg.time.get_ticks() - buttons[1]['start_ticks']
         if press_ms > settings['long_press_ms']:
@@ -2567,20 +2830,36 @@ def get_touch():
         if buttons[1].get('release') is True:
             e['release'] = True
         e['unit_name'] = player_unit_name
-        # unit_loc = get_unit_location(player_unit_name)
-        # e['spatial_pos'] = vec3_from_vec2(e['vec2'], unit['pos'])
-        e['spatial_key'] = get_key_at_px(e['vec2'])
-        # e['spatial_loc'] = get_location_at_pos(e['spatial_pos'])
+        # if player_unit_name is not None:
+            # unit_loc = get_unit_location(player_unit_name)
+            # e['spatial_pos'] = vec3_from_vec2(e['state']['pos'], unit['pos'])
+            # e['spatial_loc'] = get_location_at_pos(e['spatial_pos'])
+        e['spatial_key'] = get_key_at_px(e['state']['pos'])
     return e
 
 
-def process_touch():
+def _process_touch(screen):
+    """
+    e['state']['new_press'] is True only
+    once (per MOUSEBUTTONDOWN/touch)
+    """
     e = get_touch()
     if e is not None:
+        act_enable = True
+        if screen is not None:
+            for widget in widgets:
+                if is_in_widget(screen, widget, e['state']['pos']):
+                    if e.get('new_press') is True:
+                        e['widget'] = widget
+                        on_widget_click(e)
+                        # del e['widget']
+                    act_enable = False
+            if e.get('widget') is not None:
+                e['ignore'] = True
         unit = get_unit(e.get('unit_name'))
         if unit is not None:
             e['unit'] = unit
-            loc = get_location_at_px(e['vec2'])
+            loc = get_location_at_px(e['state']['pos'])
             e['spatial_pos'] = (
                 float(loc[0]),
                 unit['pos'][1],
@@ -2588,18 +2867,24 @@ def process_touch():
             )
             dist = distance_planar(e['spatial_pos'], unit['pos'])
             if (dist - unit['reach']) > kEpsilon:
-                on_interact_far(e)
+                e['far'] = True
+                if act_enable:
+                    on_interact_far(e)
             else:
-                on_interact_near(e)
+                e['far'] = False
+                if act_enable:
+                    _on_interact_near(e)
             if buttons[1].get('release') is True:
                 unit['tmp']['move_multipliers'][0] = 0.0
                 unit['tmp']['move_multipliers'][2] = 0.0
-                buttons[1] = None  # ok since done on_interact_near
+                buttons[1] = None  # ok since done _on_interact_near
             else:
                 pass
                 # unit_sk = get_unit_spatial_key(player_unit_name)
                 # unit_cs = sk.split(",")
                 # unit_loc = (int(unit_cs[0]), int(unit_cs[1]))
+        _check_swipe(screen, e)
+        e['state']['new_press'] = False
     return e
 
 def default_down(event):
@@ -2610,10 +2895,13 @@ def default_down(event):
     button = event.button
     if buttons[button] is not None:
         print("WARNING: button " + str(button) + " already down.")
-    buttons[event.button] = {
+    buttons[button] = {
         'start_ticks': pg.time.get_ticks(),
         'start_pos': event.pos,
         'pos': event.pos,
+        'new_press': True,
+        'points': [event.pos],
+        'swiped': False
     }
     if button == 4:
         inventory_scroll(-1)
@@ -2628,11 +2916,12 @@ def default_up(event):
     if buttons[button] is not None:
         press_ms = pg.time.get_ticks() - buttons[button]['start_ticks']
         if press_ms > settings['long_press_ms']:
-            print("long pressed " + str(button))
+            # print("long pressed " + str(button))
+            pass
         # print("released " + str(button))
         buttons[button]['release'] = True
         # buttons[button] = None
-        process_touch()
+        _process_touch(None)
 
 
 def default_motion(event):
@@ -2652,6 +2941,7 @@ def default_motion(event):
                             - buttons[button]['start_ticks'])
                 # print("  drag " + str(button))
                 buttons[button]['pos'] = event.pos
+                buttons[button]['points'].append(event.pos)
             else:
                 print("WARNING: drag added button " + str(button))
 
