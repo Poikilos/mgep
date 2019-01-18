@@ -91,6 +91,7 @@ player_unit_name = None
 game_tile_size = None
 units = {}
 default_font = None
+default_font_size = None
 popup_text = ""
 popup_showing_text = None
 popup_surf = None
@@ -253,8 +254,12 @@ def on_widget_click(e):
         widget['f'](e)
 
 
-def draw_ui(e):
+def _on_draw_ui(e):
+
     surf = e.get('screen')
+    q = bindings.get('draw_ui')
+    for f in q:
+        f({'screen': surf})
 
     inv_cursor_max = None
     material_slots = None  # keys for unit['materials'] dict
@@ -279,6 +284,7 @@ def draw_ui(e):
                 set_unit_value(name, 'selected_slot', selected_slot)
 
     if surf is not None:
+        side = 'right'
         win_size = surf.get_size()
         tile_size = get_tile_size()
         preview_size = int(tile_size[0]), int(tile_size[1])
@@ -291,10 +297,31 @@ def draw_ui(e):
         margin_px = thickness * 2
         border_size = (preview_size[0]+thickness*2,
                        preview_size[1]+thickness*2)
-        x = margin_px + thickness
-        y = win_size[1] - preview_size[1] - (margin_px - thickness) - 1
+        offset_coord = 1
+        space_size = (
+            border_size[0] + margin_px,
+            border_size[1] + margin_px
+        )
+        fars = (
+            win_size[0] - preview_size[0] - (margin_px - thickness) - 1,
+            win_size[1] - preview_size[1] - (margin_px - thickness) - 1
+        )
+        nears = margin_px + thickness, margin_px + thickness
+        if side == 'bottom':
+            offset_coord = 0
+            x = round(win_size[0] / 2.0 - preview_size[0] / 2.0)
+            y = fars[1]
+        else:
+            x = fars[0]
+            y = round(win_size[1] / 2.0 - preview_size[1] / 2.0)
+        offset = border_size[offset_coord] + margin_px
+        offsets = [0, 0]
+        offsets[offset_coord] = offset
+        if selected_slot is not None:
+            x -= offsets[0] * selected_slot
+            y -= offsets[1] * selected_slot
         item_color = (64, 64, 64)
-        material_color = (80, 10, 20)
+        material_color = (32, 32, 32)
         color = item_color
         select_color = (255, 255, 255)
         blank_color = (64, 64, 64, 64)
@@ -302,7 +329,7 @@ def draw_ui(e):
         counts = {}
         before_mid_count = math.floor(inv_cursor_max / 2)
         from_mid_count = inv_cursor_max - before_mid_count
-        offset = border_size[0] + margin_px
+
         materials = unit.get('materials')
         if materials is None:
             materials = {}
@@ -362,9 +389,8 @@ def draw_ui(e):
             if count is not None:
                 draw_text_vec2(str(count), (255, 255, 255), surf,
                                (x+1, y+1))
-            x += offset
-
-bindings['draw_ui'].append(draw_ui)
+            x += offsets[0]
+            y += offsets[1]
 
 # speed test: https://stackoverflow.com/questions/134626/which-is-more-\
 # preferable-to-use-in-python-lambda-functions-or-nested-functions
@@ -478,7 +504,8 @@ settings['human_run_accel'] = got.get('human_run_accel', 3.0)  # approx
 settings['human_run_max_mps'] = got.get('human_run_max_mps', 12.4)
 """12.4 m/s = 27.8 miles per hour"""
 settings['sys_font_name'] = got.get('sys_font_name', 'Arial')
-settings['sys_font_size'] = got.get('sys_font_size', 12)
+settings['sys_font_size'] = got.get('sys_font_size', 16)
+print("settings['sys_font_size']: " + str(settings['sys_font_size']))
 settings['swipe_multiplier'] = got.get('swipe_multiplier', .2)
 """pygame only accepts int"""
 settings['default_world_gravity'] = got.get('default_world_gravity',
@@ -1557,6 +1584,25 @@ def render_unit(screen, unit_name, unit, sprite_scale,
     # surface = next(anim)
 
 
+def ensure_default_font():
+    global default_font
+    global default_font_size
+    new_font_size = int(settings['sys_font_size'])
+    if (default_font is None) or (default_font_size != new_font_size):
+        print("new_font_size: " + str(new_font_size))
+        default_font_size = new_font_size
+        default_font = pg.font.SysFont(settings['sys_font_name'],
+                                       default_font_size)
+
+def teleport_unit(unit, pos):
+    sk = get_key_at_pos(pos)
+    y = max(pos[1], float(len(get_stack(sk))))
+    unit['pos'] = (pos[0], y, pos[2])
+    unit['mps_vec3'] = [0.0, 0.0, 0.0]
+
+def teleport_unit_2d(unit, x, z):
+    teleport_unit(unit, (x, 0, z))
+
 def draw_frame(screen):
     global settings
     global temp_screen
@@ -1609,10 +1655,7 @@ def draw_frame(screen):
             # fps_s = str(clock.get_fps())  # clock is only in game
     else:
         prev_frame_ticks = this_frame_ticks
-
-    if default_font is None:
-        default_font = pg.font.SysFont(settings['sys_font_name'],
-                                       int(settings['sys_font_size']))
+    ensure_default_font()
     text_pos = [4, 4]
     # pg.draw.rect(screen, color, pg.Rect(x, y, 64, 64))
     new_win_size = screen.get_size()
@@ -2081,6 +2124,9 @@ def draw_frame(screen):
                       fmt_vec(unit['mps_vec3'], places=places))
         unit['tmp']['prev_ground_yB'] = ground_yB
         # render_unit(unit, sprite_scale)
+        if unit['pos'][1] < -8:
+            # return to spawn (origin)
+            teleport_unit_2d(unit, 0, 0)
         if k == player_unit_name:
             if visual_debug_enable:
                 # push_text("  after.ground_y:" + str(ground_yB))
@@ -2180,9 +2226,7 @@ def draw_frame(screen):
             text_pos[1] += text_size[1]
             popup_alpha -= settings["popup_alpha_per_sec"] * passed
     global bindings
-    q = bindings.get('draw_ui')
-    for f in q:
-        f({'screen': screen})   # formerly scalable_surf
+    _on_draw_ui({'screen': screen})
     # screen.blit(pg.transform.scale(scalable_surf,
     #                                (int(win_size[0]),int(win_size[1]))),
     #             (0,0))
@@ -2305,9 +2349,7 @@ def show_stats_once():
 
 def draw_text_vec2(s, color, surf, vec2):
     global default_font
-    if default_font is None:
-        default_font = pg.font.SysFont(settings['sys_font_name'],
-                                       int(settings['sys_font_size']))
+    ensure_default_font()
     if surf is not None:
         s_surf = default_font.render(s, settings['text_antialiasing'],
                                      color)
@@ -2320,9 +2362,7 @@ def push_text(s, color=(255, 255, 255), screen=None):
     global temp_screen
     global settings
     global default_font
-    if default_font is None:
-        default_font = pg.font.SysFont(settings['sys_font_name'],
-                                       int(settings['sys_font_size']))
+    ensure_default_font()
     if screen is not None:
         temp_screen = screen
     if temp_screen is not None:
@@ -2811,6 +2851,7 @@ def get_touch():
         press_ms = pg.time.get_ticks() - buttons[1]['start_ticks']
         if press_ms > settings['long_press_ms']:
             e['long_press'] = True
+            e['state']['swiped'] = True  # cancel gesture if long press
         e['unit_name'] = player_unit_name
         # if player_unit_name is not None:
             # unit_loc = get_unit_location(player_unit_name)
@@ -2889,8 +2930,10 @@ def default_down(event):
     }
     if button == 4:
         inventory_scroll(-1)
+        buttons[button] = None
     elif button == 5:
         inventory_scroll(1)
+        buttons[button] = None
 
 
 def default_up(event):
