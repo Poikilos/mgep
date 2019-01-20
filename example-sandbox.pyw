@@ -40,6 +40,7 @@ load_material('dirt', 1, 2)
 load_material('grass', 1, 3)
 load_material('grass', 2, 3)
 load_material('grass', 3, 3)
+load_material('sand', 1, 4)
 # load_tileset("mgep/tiles/Atlas/terrain_atlas.png", 32, 32)
 # load_material('bedrock', 14, 10, native=False)
 # load_material('bedrock', 16, 6, native=False)
@@ -65,14 +66,14 @@ npc_name = 'Stella'
 place_character('male', player_name, (0, 0))
 place_character('female', npc_name, (2, 0))
 
-def swipe_direction(e):
+def long_jump(e):
     move_direction(player_name, e['direction'])
     unit_jump(player_name, 5)
 
 set_visual_debug(True)
 
 # bind('draw_ui', on_draw_ui)
-bind('swipe_direction', swipe_direction)
+bind('swipe_direction', long_jump)
 resize_count = 0
 while not done:
     for event in pg.event.get():

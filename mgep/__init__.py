@@ -12,6 +12,8 @@ import random
 import math
 import os
 import sys
+import platform
+
 try:
     import angles
 except ImportError:
@@ -38,6 +40,29 @@ H_BIT = 4
 """something touches the outer horizontal side of quartertile"""
 V_BIT = 8
 """something touches the outer vertical side of quartertile"""
+
+# sys_lower = platform.system().lower()
+# if ("win" in sys_lower):
+
+profile_path = os.environ.get('HOME')
+appdatas_path = None
+if profile_path is None:
+    profile_path = os.environ.get('USERPROFILE')
+    if profile_path is not None:
+        root_appdatas_path = os.path.join(profile_path, "AppData")
+        appdatas_path = os.path.join(root_appdatas_path, "Roaming")
+else:
+    if profile_path is not None:
+        appdatas_path = os.path.join(profile_path, ".config")
+
+if profile_path is None:
+    print("ERROR: no USERPROFILE or HOME, so saving to " + os.getcwd())
+    profile_path = "."
+    appdatas_path = "."
+
+appdata_path = os.path.join(appdatas_path, "mgep")
+if not os.path.isdir(appdata_path):
+    os.makedirs(appdata_path)
 
 TOP_BIT_MASKS = [None, None, 8, 9, None, None,
                  0, 4, 12, 13, 5, 1,
@@ -476,49 +501,61 @@ while w <= 1024:
         # print("  abs_slack: " + str(abs_slack(two_h)))
         # print("  two_h: " + str(two_h))
     w += 1
-data = None
-settings_path = "settings-mgep.json"
-if os.path.isfile(settings_path):
-    with open(settings_path, "r") as ins:
-        data = json.load(ins)
-got = data
-if got is None:
-    got = {}
-print("settings path: " + os.path.abspath(settings_path))
-# print("settings loaded: " + str(got))
-settings = {}
-settings['long_press_ms'] = got.get('long_press_ms', 200)
-settings['point_size_divisor'] = got.get('point_size_divisor', 200)
-settings['target_size_divisor'] = got.get('target_size_divisor', 200)
-settings['popup_sec_per_glyph'] = got.get('popup_sec_per_glyph', .04)
-settings['popup_alpha_per_sec'] = got.get('popup_alpha_per_sec', 128.0)
-settings['text_antialiasing'] = got.get('text_antialiasing', True)
-settings['human_run_slow_mps'] = got.get('human_run_slow_mps', 4.47)
-"""4.47 m/s = 10 miles per hour"""
-settings['human_walk_mps'] = got.get('human_walk_mps', 3.0)  # approx
-settings['human_walk_accel'] = got.get('human_walk_accel', 12.0)
-"""approx"""
-settings['human_run_mps'] = got.get('human_run_mps', 6.7)
-"""6.7 m/s = 15 miles per hour"""
-settings['human_run_accel'] = got.get('human_run_accel', 3.0)  # approx
-settings['human_run_max_mps'] = got.get('human_run_max_mps', 12.4)
-"""12.4 m/s = 27.8 miles per hour"""
-settings['sys_font_name'] = got.get('sys_font_name', 'Arial')
-settings['sys_font_size'] = got.get('sys_font_size', 16)
-print("settings['sys_font_size']: " + str(settings['sys_font_size']))
-settings['swipe_multiplier'] = got.get('swipe_multiplier', .2)
-"""pygame only accepts int"""
-settings['default_world_gravity'] = got.get('default_world_gravity',
-                                            9.8)
-if not equal_str_content(settings, got):
-    with open(settings_path, "w") as outs:
-        json.dump(settings, outs)
-spare_keys = get_spare_keys(settings, got)
-if len(spare_keys) > 0:
-    print("got the following unknown settings from '" +
-          os.path.abspath(settings_path) + ":")
-    print("  " + str(spare_keys))
 
+
+settings_path = os.path.join(appdata_path, "settings-mgep.json")
+settings = {}
+
+
+def dict_overlay(actual_dict, partial_dict, key, default):
+    actual_dict[key] = partial_dict.get(key, default)
+
+
+def load_settings():
+    global settings
+    data = None
+    if os.path.isfile(settings_path):
+        with open(settings_path, "r") as ins:
+            data = json.load(ins)
+    got = data
+    if got is None:
+        got = {}
+    print("settings path: " + os.path.abspath(settings_path))
+    # print("settings loaded: " + str(got))
+    settings = {}
+    dict_overlay(settings, got, 'long_press_ms', 200)
+    dict_overlay(settings, got, 'point_size_divisor', 200)
+    dict_overlay(settings, got, 'target_size_divisor', 200)
+    dict_overlay(settings, got, 'popup_sec_per_glyph', .04)
+    dict_overlay(settings, got, 'popup_alpha_per_sec', 128.0)
+    dict_overlay(settings, got, 'text_antialiasing', True)
+    # 4.47 m/s = 10 miles per hour:
+    dict_overlay(settings, got, 'human_run_slow_mps', 4.47)
+    dict_overlay(settings, got, 'human_walk_mps', 3.0)  # approx
+    dict_overlay(settings, got, 'human_walk_accel', 12.0)  # approx
+    # 6.7 m/s = 15 miles per hour
+    dict_overlay(settings, got, 'human_run_mps', 6.7)
+    dict_overlay(settings, got, 'human_run_accel', 3.0)  # approx
+    # 12.4 m/s = 27.8 miles per hour
+    dict_overlay(settings, got, 'human_run_max_mps', 12.4)
+    dict_overlay(settings, got, 'sys_font_name', 'Arial')
+    # pygame only accepts int:
+    dict_overlay(settings, got, 'sys_font_size', 12)
+    dict_overlay(settings, got, 'swipe_factor', .2)
+    dict_overlay(settings, got, 'default_world_gravity', 9.8)
+    dict_overlay(settings, got, 'default_world_height', 12)
+
+    if not equal_str_content(settings, got):
+        with open(settings_path, "w") as outs:
+            json.dump(settings, outs)
+    spare_keys = get_spare_keys(settings, got)
+    if len(spare_keys) > 0:
+        print("got the following unknown settings from '" +
+              os.path.abspath(settings_path) + ":")
+        print("  " + str(spare_keys))
+
+
+load_settings()
 # print("settings used: " + str(settings))
 last_loaded_world_name = None
 temp_screen = None
@@ -578,7 +615,13 @@ def get_setting(name):
 
 def load(name, default=None):
         # , file_format='list', as_type='string'):
-    path = name + '.json'
+    filename = name + '.json'
+    global appdata_path
+
+    files_path = appdata_path
+    if last_loaded_world_name is not None:
+        files_path = os.path.join(appdata_path, last_loaded_world_name)
+    path = os.path.join(files_path, filename)
     ret = None
     if os.path.isfile(path):
         print("loading '" + path + "'")
@@ -602,7 +645,13 @@ def trim_dict(data):
 
 
 def save(name, data):  # , file_format='list'):
-    path = name + '.json'
+    global appdata_path
+    filename = name + '.json'
+    global last_loaded_world_name
+    files_path = appdata_path
+    if last_loaded_world_name is not None:
+        files_path = os.path.join(appdata_path, last_loaded_world_name)
+    path = os.path.join(files_path, filename)
     # save1d.save(name, data, file_format=file_format)
     with open(path, "w") as outs:
         data_trim = trim_dict(data)
@@ -842,13 +891,15 @@ def get_location_at_px(vec2, cam_vec2=None):
     col, row = get_location_at_pos(vec3)
     return col, row
 
+def get_key_at_loc(loc):
+    return str(loc[0]) + "," + str(loc[1])
 
 def get_key_at_px(vec2, cam_vec2=None):
     loc = get_location_at_px(vec2, cam_vec2=cam_vec2)
     return str(loc[0]) + "," + str(loc[1])
 
 
-def vec3_from_vec2(vec2, vec3, cam_vec2=None):
+def vec3_from_vec2(vec2, vec3, cam_vec2=None, occlude=True):
     """get 3D location from 2D screen location assuming vec3's y
     a.k.a. elevation (usually player unit's y)
     see also: get_loc_at_px
@@ -870,7 +921,8 @@ def vec3_from_vec2(vec2, vec3, cam_vec2=None):
             int(round(camera['pos'][0] * scaled_b_size[0])),
             int(round(camera['pos'][2] * scaled_b_size[1]))
         )
-    y = vec3[1]
+    # y = vec3[1]
+    y = 0
     # x = (vec2[0] + cam_vec2[0]) / scaled_b_size[0]
     # z is screen y on ground plane:
     # but as the elevation gets higher, the world z gets higher
@@ -879,7 +931,34 @@ def vec3_from_vec2(vec2, vec3, cam_vec2=None):
     map_x = (vec2[0] - screen_half[0]) + cam_vec2[0]
     map_y = -1*(vec2[1] - screen_half[1]) + cam_vec2[1]
     x = map_x / scaled_b_size[0]
-    z = map_y / scaled_b_size[1] - y
+    z = map_y / scaled_b_size[1] - 1
+    if occlude:
+        found_y = None
+        found_row = None
+        bottom_pos = x, z
+        # push_text("vec3_from_vec2(...): " + str((x, y, z)))
+        # TODO: asdf get block by top (start from a lower z value (south)
+        # and keep moving up until find one in the way of clicked block
+        bottom_loc = get_location_at_pos((x, y, z))
+        col, row = bottom_loc
+        closest_row = row - world['height']
+        # TODO: use screen-based value instead of world['height']
+        print("bottom_loc: " + str(bottom_loc))
+        for try_row in range(closest_row, row):
+            try_loc = col, try_row
+            stack = get_stack(get_key_at_loc(try_loc))
+            abs_y = 0
+            for try_i in range(len(stack)):
+                rel_h = 1  # TODO: make blocks variable height
+                if try_row + abs_y >= bottom_loc[1]:
+                    found_y = abs_y
+                    found_row = try_row
+                    y = found_y
+                    z = found_row
+                    break
+                abs_y += rel_h
+            if found_y is not None:
+                break
     return (x, y, z)
 
 def vec2_from_vec3_via_camera(vec3, cam_vec2=None):  # src_size,
@@ -1808,8 +1887,10 @@ def draw_frame(screen):
     sel_x = None
     sel_y = None
     sel_rise = None
+    sel_vec3 = None
     if e is not None:
         sel_key = e.get('spatial_key')
+        sel_vec3 = e.get('spatial_pos')
     while block_y >= end_loc[1]:
         block_x = start_loc[0]
         sel_x = None
@@ -1858,11 +1939,12 @@ def draw_frame(screen):
                     #      scaled_b_size[0]/2)
                     # y = (-1*(pos[2]-camera_px[1]) + screen_half[1] -
                     #      scaled_b_size[1]/2)
-                    if sel_key == sk:
+                    if (sel_key == sk) and (i == round(sel_vec3[1])):
                         prev_sel = True
                         sel_x = x
                         sel_y = y
                         sel_rise = block_rise_as_y_px
+                        print("sel_vec3: " + str(sel_vec3))
                     if side is not None:
                         screen.blit(pg.transform.scale(side,
                                                        scaled_b_size),
@@ -2358,6 +2440,11 @@ def draw_text_vec2(s, color, surf, vec2):
 
 
 def push_text(s, color=(255, 255, 255), screen=None):
+    if (len(s) > 500):
+        print("UH OH, string length is " + str(len(s)) + "so truncating"
+              " to prevent pygame surface size overflow:")
+        print(s)
+        s = s[:500]
     global text_pos
     global temp_screen
     global settings
@@ -2368,6 +2455,10 @@ def push_text(s, color=(255, 255, 255), screen=None):
     if temp_screen is not None:
 
         try:
+            # print("default_font_size: " + str(default_font_size))
+            # print("s: " + str(s))
+            # print("text_antialiasing: " + str(settings['text_antialiasing']))
+            # print("color: " + str(color))
             s_surf = default_font.render(s,
                                          settings['text_antialiasing'],
                                          color)
@@ -2703,6 +2794,7 @@ def set_player_unit_name(name):
 
 
 def inventory_scroll(amount):
+    loop_inventory_scroll = False
     name = player_unit_name
     if name is not None:
         selected_slot = get_unit_value(name, 'selected_slot')
@@ -2711,12 +2803,18 @@ def inventory_scroll(amount):
             selected_slot = 0
         selected_slot += amount
         if selected_slot < 0:
-            selected_slot = inv_cursor_max + selected_slot
-        if selected_slot >= inv_cursor_max:
-            if inv_cursor_max > 0:
-                selected_slot %= inv_cursor_max
+            if loop_inventory_scroll:
+                selected_slot = inv_cursor_max + selected_slot
             else:
                 selected_slot = 0
+        if selected_slot >= inv_cursor_max:
+            if loop_inventory_scroll:
+                if inv_cursor_max > 0:
+                    selected_slot %= inv_cursor_max
+                else:
+                    selected_slot = 0
+            else:
+                selected_slot = inv_cursor_max - 1
         set_unit_value(name, 'selected_slot', selected_slot)
 
 buttons = [None, None, None, None, None, None, None, None]
@@ -2799,7 +2897,7 @@ def _check_swipe(screen, e):
     if screen is not None:
         w, h = screen.get_size()
         short_px = min(w, h)
-        min_px = round(settings['swipe_multiplier'] * float(short_px))
+        min_px = round(settings['swipe_factor'] * float(short_px))
         points = e['state']['points']
         if len(points) > 1:
             start_pos = points[0]
@@ -2883,10 +2981,12 @@ def _process_touch(screen):
         unit = get_unit(e.get('unit_name'))
         if unit is not None:
             e['unit'] = unit
-            loc = get_location_at_px(e['state']['pos'])
+            # loc = get_location_at_px(e['state']['pos'])
+            vec3 = vec3_from_vec2(e['state']['pos'], (0.0, 0.0, 0.0))
+            loc = get_location_at_pos(vec3)
             e['spatial_pos'] = (
                 float(loc[0]),
-                unit['pos'][1],
+                vec3[1],  # unit['pos'][1],
                 float(loc[1])
             )
             dist = distance_planar(e['spatial_pos'], unit['pos'])
@@ -3118,16 +3218,25 @@ def push_node(key, node):
         stack_max_keys.append(sk)
 
 
-def save_world():
+def save_world(name=None):
     print("saving world...")
     global last_loaded_world_name
     global world
-    if last_loaded_world_name is not None:
-        name = last_loaded_world_name
-        path = name + ".json"
+    if name is None:
+        if last_loaded_world_name is not None:
+            name = last_loaded_world_name
+    if name is not None:
+        filename = "world.json"
+        global appdata_path
+        files_path = os.path.join(appdata_path, name)
+        if not os.path.isdir(files_path):
+            os.makedirs(files_path)
+        path = os.path.join(files_path, filename)
         with open(path, "w") as outs:
             json.dump(world, outs)
         print("saved '" + os.path.abspath(path))
+    else:
+        print("ERROR: Can't save world--no load_world nor name param")
 
 
 def load_world(name, generate=False):
@@ -3136,7 +3245,12 @@ def load_world(name, generate=False):
     global settings
     last_loaded_world_name = name
     world = None
-    path = name + ".json"
+    global appdata_path
+    filename = "world.json"
+    files_path = os.path.join(appdata_path, name)
+    if not os.path.isdir(files_path):
+        os.makedirs(files_path)
+    path = os.path.join(files_path, filename)
     print("world path: " + path)
     if os.path.isfile(path):
         print("  loading...")
@@ -3145,6 +3259,8 @@ def load_world(name, generate=False):
     if world is not None:
         if 'gravity' not in world:
             world['gravity'] = settings['default_world_gravity']
+        if 'height' not in world:
+            world['height'] = settings['default_world_height']
         print("  loaded existing world.")
         return
     else:

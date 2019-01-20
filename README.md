@@ -80,7 +80,7 @@ making helpful assumptions.
 * percentage-based widget system that adapts to screen resolution
   changes instantly (pos and size are multiplied by screen size)
 * Swipe events (simple angle only) are detected if swipe is as long as
-  `settings['swipe_multiplier'] * short_px` where short_px is shorter
+  `settings['swipe_factor'] * short_px` where short_px is shorter
   dimension of screen detected.
 
 ### API Notes
