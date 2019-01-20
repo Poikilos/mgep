@@ -943,7 +943,7 @@ def vec3_from_vec2(vec2, vec3, cam_vec2=None, occlude=True):
         col, row = bottom_loc
         closest_row = row - world['height']
         # TODO: use screen-based value instead of world['height']
-        print("bottom_loc: " + str(bottom_loc))
+        # print("bottom_loc: " + str(bottom_loc))
         for try_row in range(closest_row, row):
             try_loc = col, try_row
             stack = get_stack(get_key_at_loc(try_loc))
@@ -1888,9 +1888,12 @@ def draw_frame(screen):
     sel_y = None
     sel_rise = None
     sel_vec3 = None
+    is_top = True
     if e is not None:
         sel_key = e.get('spatial_key')
         sel_vec3 = e.get('spatial_pos')
+    push_text("sel_vec3: " + str(sel_vec3))
+
     while block_y >= end_loc[1]:
         block_x = start_loc[0]
         sel_x = None
@@ -1944,7 +1947,9 @@ def draw_frame(screen):
                         sel_x = x
                         sel_y = y
                         sel_rise = block_rise_as_y_px
-                        print("sel_vec3: " + str(sel_vec3))
+                        is_top = True
+                    else:
+                        is_top = False
                     if side is not None:
                         screen.blit(pg.transform.scale(side,
                                                        scaled_b_size),
@@ -1968,16 +1973,17 @@ def draw_frame(screen):
                 sel_thickness
             )
             prev_sel = False
-        if sel_x is not None:
-            pg.draw.rect(
-                screen,
-                sel_color,
-                pg.Rect(sel_x, sel_y-sel_rise,
-                        scaled_b_size[0],
-                        scaled_b_size[1]),
-                sel_thickness
-            )
-            target_enable = False
+        if is_top:
+            if sel_x is not None:
+                pg.draw.rect(
+                    screen,
+                    sel_color,
+                    pg.Rect(sel_x, sel_y-sel_rise,
+                            scaled_b_size[0],
+                            scaled_b_size[1]),
+                    sel_thickness
+                )
+                target_enable = False
         for unit_name, unit in prev_units.items():
             render_unit(screen, unit_name, unit, sprite_scale,
                         camera_vec2=camera_px)
@@ -3137,7 +3143,7 @@ def _recalculate_tops():
             stack_max = len(stack)
             stack_max_keys = [sk]
         elif len(stack) == stack_max:
-            if stack_max > 1:
+            if stack_max > 2:
                 stack_max_keys.append(sk)
             # other code must assume ALL keys are needed if 0 or 1
             stack_max = len(stack)
@@ -3155,7 +3161,7 @@ def pop_node(key):
     if sk in stacks:
         stack_prev_len = len(stacks[sk])
         stack_len = stack_prev_len
-        if stack_len > 1:
+        if stack_len > 2:
             result = stacks[sk].pop()
             stack_len -= 1
             if stack_len > stack_max:
