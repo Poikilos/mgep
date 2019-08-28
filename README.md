@@ -68,8 +68,8 @@ making helpful assumptions.
 
 ### Primary Features
 * procedural:
-  * less typing is required
-  * any save method that takes dictionary can save game data
+  * designed for beginners or others with reasons for less typing
+  * dicts not classes--save game data with any dictionary save method
 * responsive scaling for any narrow or wide screen ratio (maintain
   apparent pixel size)
 * load sprites quickly and easily with specialized load_material,
@@ -119,6 +119,11 @@ def player_unit_jump(e):
 
 add_widget((.5, 0), (.5, .5), f=player_unit_jump)
 
+def scroll(e):
+    inventory_scroll(e['custom']['dir'])
+
+add_widget((.95, 0), (.05, .5), f=scroll, f_params_dict={'dir': -1})
+add_widget((.95, .5), (.05, .5), f=scroll, f_params_dict={'dir': 1})
 ```
 
 ## Issues
@@ -196,8 +201,8 @@ fi
   down toward bottom of screen)
 * material spec (dict with the following keys):
   * path: each material belongs to a tileset (saved as path string)
-  * serials: dict of lists of tuples
-    * serials[pose] is ALWAYS a list() even if pose is one frame
+  * cell_lists: dict of lists of tuples
+    * `cell_lists[pose]` is ALWAYS a list() even if pose is one frame
       * each tuple is an ordered pair of block in tileset for frame
     * subkey can be generated, but could also be special such as tr.grass
     * Coordinates are address as (x,y) by block (not pixel) starting at 1.

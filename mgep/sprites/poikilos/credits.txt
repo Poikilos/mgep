@@ -1,8 +1,9 @@
-Gold nugget (placer gold) 2 by James St. John
-original: flickr.com/photos/jsjgeology/17025829922
+gold; gold-big
+original: Gold nugget (placer gold) 2 by James St. John
+flickr.com/photos/jsjgeology/17025829922
 license: CC BY 2.0
 https://creativecommons.org/licenses/by/2.0
-sprite by poikilos
+sprites by poikilos
 
 gold coin
 "metal coin, gold, money, cash"

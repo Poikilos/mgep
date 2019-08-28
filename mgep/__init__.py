@@ -160,6 +160,7 @@ named_delta_vec3s['up'] = named_delta_vec3s['n']
 named_delta_vec3s['left'] = named_delta_vec3s['w']
 named_delta_vec3s['down'] = named_delta_vec3s['s']
 
+
 def add_widget(pos, size, text=None, surface=None, section="main",
                text_pos=None, font_aa=True, font_color=(255, 255, 255),
                font_name=None, font_size=None, border_color=None,
@@ -225,6 +226,44 @@ def is_in_widget(screen, widget, px_vec2):
     return rect.collidepoint(px_vec2)
 
 
+def draw_outline(screen, color, rect, width=1, inflate=0,
+                 line_pattern=None):
+    """
+    Allows controlling where outline grows, unlike `pygame.draw.rect`.
+
+    Keyword arguments:
+    width -- thickness (starts at real edge unless inflate>0)
+    inflate -- where rectangle starts beyond rect
+    """
+    tl = rect.x, rect.y  # top left
+    size = rect.size
+    if inflate > 0:
+        tl = tl[0] - inflate, tl[1] - inflate
+        size = size[0] + inflate * 2, size[1] + inflate * 2
+    thickness = width
+    brush_size = (thickness+1, thickness+1)  # + 1 for exclusive rect
+    br = tl[0] + size[0], tl[1] + size[1]  # bottom right
+    inner_size = size[0] - thickness * 2, size[1] - thickness * 2
+    # if line_pattern is None:
+    # top:
+    this_rect = pg.Rect(tl, (size[0], brush_size[1]))
+    pg.draw.rect(screen, color, this_rect)
+    # bottom:
+    this_rect = pg.Rect((tl[0], br[1]-thickness),
+                        (size[0], brush_size[1]))
+    pg.draw.rect(screen, color, this_rect)
+    # left:
+    this_rect = pg.Rect((tl[0], tl[1]),
+                        (brush_size[0], size[1]))
+    pg.draw.rect(screen, color, this_rect)
+    # right:
+    this_rect = pg.Rect((br[0]-thickness, tl[1]),
+                        (brush_size[0], size[1]))
+    pg.draw.rect(screen, color, this_rect)
+    # else:
+        # this_rect = pg.Rect(tl, )
+
+
 def render_widget(screen, widget):
     surf = screen
     win_size = screen.get_size()
@@ -263,7 +302,7 @@ def render_widget(screen, widget):
         thickness = round(short_px / float(psd))
         if thickness < 1:
             thickness = 1
-        pg.draw.rect(
+        draw_outline(
             screen,
             border_color,
             pg.Rect(pos_px, size_px),
@@ -279,15 +318,14 @@ def on_widget_click(e):
         widget['f'](e)
 
 
-def _on_draw_ui(e):
-
+def _DEPRECTED_draw_slots(e):
     surf = e.get('screen')
     q = bindings.get('draw_ui')
     for f in q:
         f({'screen': surf})
 
     inv_cursor_max = None
-    material_slots = None  # keys for unit['materials'] dict
+    material_slots = None  # keys for unit['stacks'] dict
     name = get_player_unit_name()
     selected_slot = None
     if (name is not None):
@@ -328,8 +366,8 @@ def _on_draw_ui(e):
             border_size[1] + margin_px
         )
         fars = (
-            win_size[0] - preview_size[0] - (margin_px - thickness) - 1,
-            win_size[1] - preview_size[1] - (margin_px - thickness) - 1
+            win_size[0] - preview_size[0] - margin_px - thickness,
+            win_size[1] - preview_size[1] - margin_px - thickness
         )
         nears = margin_px + thickness, margin_px + thickness
         if side == 'bottom':
@@ -349,16 +387,16 @@ def _on_draw_ui(e):
         material_color = (32, 32, 32)
         color = item_color
         select_color = (255, 255, 255)
-        blank_color = (64, 64, 64, 64)
+        blank_color = (64, 64, 64, 64)  # (0, 0, 0, 128)
         this_color = item_color
         counts = {}
         before_mid_count = math.floor(inv_cursor_max / 2)
         from_mid_count = inv_cursor_max - before_mid_count
 
-        materials = unit.get('materials')
-        if materials is None:
-            materials = {}
-            unit['materials'] = materials
+        stacks = unit.get('stacks')
+        if stacks is None:
+            stacks = {}
+            unit['stacks'] = stacks
         for theoretical_i in range(inv_cursor_max):
             slot_i = theoretical_i
             count = None
@@ -366,7 +404,7 @@ def _on_draw_ui(e):
             if slot_i >= len(items):
                 slot_i -= len(items)
                 what = material_slots[slot_i]
-                count = materials[what]
+                count = stacks[what]
                 this_color = material_color
             else:
                 what = items[slot_i]['what']
@@ -387,11 +425,12 @@ def _on_draw_ui(e):
                 continue
 
             # draw outline
-            pg.draw.rect(
+            draw_outline(
                 surf,
                 color,
                 pg.Rect(x-thickness, y-thickness, border_size[0],
-                        border_size[1])
+                        border_size[1]),
+                thickness
             )
 
             # draw item or material
@@ -403,7 +442,7 @@ def _on_draw_ui(e):
                     ),
                     (x, y)
                 )
-            else:
+            else:  # draw default background if 0 (empty slot, no image)
                 pg.draw.rect(
                     surf,
                     blank_color,
@@ -411,30 +450,45 @@ def _on_draw_ui(e):
                 )
 
             # draw the quantity
-            if count is not None:
+            if (count is not None) and (count > 0):
                 draw_text_vec2(str(count), (255, 255, 255), surf,
                                (x+1, y+1))
             x += offsets[0]
             y += offsets[1]
+
+
+def _on_draw_ui(e):
+    surf = e.get('screen')
+    q = bindings.get('draw_ui')
+    for f in q:
+        f({'screen': surf})
+
+    _DEPRECTED_draw_slots(e)
+
 
 # speed test: https://stackoverflow.com/questions/134626/which-is-more-\
 # preferable-to-use-in-python-lambda-functions-or-nested-functions
 def clamp(value, minv, maxv):
     return max(min(value, maxv), minv)
 
+
 def z_of_byte(b):
     return -(float(b)/255.0)
+
 
 def f_of_byte(b):
     return (float(b)/255.0)
 
+
 def byte_of_z(n):
     return clamp(int((-n * .5 + .5) * 255.0), 0, 255)
+
 
 def byte_of_f(n):
     # NOTE: for Z of normal, remember tangent space is 0 to -1 (half
     # depth since never points back) but maps to 128 to 255 (inverse)
     return clamp(int((n * .5 + .5) * 255.0), 0, 255)
+
 
 def bind(when, f):
     """
@@ -948,7 +1002,10 @@ def vec3_from_vec2(vec2, vec3, cam_vec2=None, occlude=True):
             try_loc = col, try_row
             stack = get_stack(get_key_at_loc(try_loc))
             abs_y = 0
-            for try_i in range(len(stack)):
+            this_len = 0
+            if stack is not None:
+                this_len = len(stack)
+            for try_i in range(this_len):
                 rel_h = 1  # TODO: make blocks variable height
                 if try_row + abs_y >= bottom_loc[1]:
                     found_y = abs_y
@@ -1033,10 +1090,10 @@ def push_unit_item(name, item):
     if what is None:
         print("ERROR: item missing 'what': " + str(item))
         # allow exception below
-    materials = units[name].get('materials')
-    if materials is None:
-        materials = {}
-        units[name]['materials'] = materials
+    stacks = units[name].get('stacks')
+    if stacks is None:
+        stacks = {}
+        units[name]['stacks'] = stacks
     if is_stackable(what):
         slot_i = -1
         material_slots = units[name].get('material_slots')
@@ -1053,11 +1110,11 @@ def push_unit_item(name, item):
             slot_i = len(material_slots)
             material_slots.append(what)
 
-        count = materials.get(what)
+        count = stacks.get(what)
         if count is None:
-            materials[what] = 1
+            stacks[what] = 1
         else:
-            materials[what] += 1
+            stacks[what] += 1
     else:
         items = units[name].get('items')
         if items is None:
@@ -1131,17 +1188,17 @@ def pop_unit_item(name):
 
 def pop_unit_what_item(name, what):
     result = None
-    materials = None
+    stacks = None
     items = None
     if is_stackable(what):
-        materials = units[name].get('materials')
+        stacks = units[name].get('stacks')
         count = 0
-        if materials is not None:
-            count = materials.get(what)
+        if stacks is not None:
+            count = stacks.get(what)
             if count is None:
                 count = 0
         if count > 0:
-            materials[what] -= 1
+            stacks[what] -= 1
             result = new_material(what)
     else:
         items = units[name].get('items')
@@ -1287,7 +1344,7 @@ def find_graphic(haystack_material, needle_path, needle_loc):
                   + material['path'] + "'")
         return ret
     if (col is not None) and (row is not None):
-        for pose, cells in material['serials'].items():
+        for pose, cells in material['cell_lists'].items():
             for frame_i in range(len(cells)):
                 frame = cells[frame_i]
                 if (needle_loc == frame):
@@ -1628,6 +1685,7 @@ def unit_jump(name, vel_y, vel_x=None, vel_z=None,
         #           str(unit['pos'][1]))
     return False
 
+
 def render_unit(screen, unit_name, unit, sprite_scale,
                 camera_vec2=None):
     global square_sprite_size
@@ -1673,14 +1731,115 @@ def ensure_default_font():
         default_font = pg.font.SysFont(settings['sys_font_name'],
                                        default_font_size)
 
+
 def teleport_unit(unit, pos):
     sk = get_key_at_pos(pos)
     y = max(pos[1], float(len(get_stack(sk))))
     unit['pos'] = (pos[0], y, pos[2])
     unit['mps_vec3'] = [0.0, 0.0, 0.0]
 
+
 def teleport_unit_2d(unit, x, z):
     teleport_unit(unit, (x, 0, z))
+
+def get_rect_from_id(cell_id, src_size, cell_counts):
+    cell_size = (
+        int(src_size[0]/cell_counts[0]),
+        int(src_size[1]/cell_counts[1])
+    )
+    try_id = 0
+    ret = None
+    for row in range(cell_counts[0]):
+        x = 0
+        for col in range(cell_counts[1]):
+            x += cell_size[0]
+            if try_id == cell_id:
+                return pg.Rect((x, y), cell_size)
+            try_id += 1
+        y += cell_size[1]
+    return None
+
+def generate_maps(what, terrain_3x5_image, transition="positive"):
+    cell_counts = (3, 5)
+    material = materials[what]
+    if material['tmp'].get('d_maps') is not None:
+        if material['tmp']['d_maps'].get(transition) is not None
+            print("WARNING: already has t_images for " + transition
+                  + " transition during get_terrain_image")
+    else:
+        material['tmp']['d_maps'] = {}
+    material['tmp']['d_maps'][transition] = []
+    pose = material.get('default_pose')  # first-loaded one usually
+    anim = material['tmp']['sprites'][pose]  # default for transitions
+    d_maps = []
+    # diffuse maps:
+    src_size = src.get_size()
+    cell_size = (
+        int(src_size[0]/cell_counts[0]),
+        int(src_size[1]/cell_counts[1])
+    )
+    for
+        if
+            d_maps.append(src_size.subsurface(get_rect_from_id()))
+
+    material['tmp']['d_maps'][transition] = d_maps
+
+def get_terrain_image(frame, cutout_3x5_path, crop_from=None,
+                      crop_size=None):
+    """
+    Returns a 3x5 terrain surface from a single frame
+    (such as material['tmp']['sprites'][pose]) using the alpha
+    from cutout_3x5_path.
+
+    Sequential arguments:
+    cutout_3x5_path -- must be all white, and must be transparent
+                       for negative areas; must be in Liberated Pixel
+                       Cup layout (bottom 3x3 area is terrain with
+                       convex corners, top right 2x2 area is terrain
+                       with concave corners)
+
+    Keyword arguments:
+    transition -- the material name ('what') to blend with (positive
+                  for nothing (background is transparent))
+    """
+    global scaled_b_size
+    cell_counts = (3, 5)
+    t_images = []
+    alpha_image_original = file_surfs.get(cutout_3x5_path)
+    if alpha_image_original is None:
+        alpha_image_original = pg.image.load(cutout_3x5_path)
+        # do not cache, save RAM
+    dst = None
+    if crop_from is not None:
+        # dst = pygame.Surface(crop_size)
+        # dst.blit(
+            # dst_original,
+            # (0, 0),
+            # (crop_from[0], crop_from[1], crop_size[0], crop_size[1])
+        # )
+        x, y = crop_from
+        width, height = crop_size
+        # ok to use subsurface since loaded mask from file:
+        dst = alpha_image_original.subsurface(
+            (x, y, width, height)
+        )
+    else:
+        dst = alpha_image_original
+    dst_size = dst.get_size()
+    cell_size = (
+        int(dst_size[0]/cell_counts[0]),
+        int(dst_size[1]/cell_counts[1])
+    )
+    src = frame.convert_alpha()
+    y = 0
+    for row in range(cell_counts[0]):
+        x = 0
+        for col in range(cell_counts[1]):
+            x += cell_size[0]
+            # BLEND_RGBA_MULT for this requires pygame >= 1.8.1
+            pg.Surface.blit(src, dst, special_flags=BLEND_RGBA_MULT)
+        y += cell_size[1]
+    return dst
 
 def draw_frame(screen):
     global settings
@@ -1873,7 +2032,7 @@ def draw_frame(screen):
     sel_key = None
     # blue cube for selection
     reachable_color = (60, 90, 225)
-    sel_color = (200, 200, 128)
+    sel_color = (200, 200, 128)  # yellow
     if e is not None:
         if not e['far']:
             sel_color = reachable_color
@@ -1914,6 +2073,7 @@ def draw_frame(screen):
                 # rise_factor = .5
                 rise = 0.0
                 side = None
+                is_top = True
                 for i in range(len(v)):
                     # rise_px = block_rise_as_y_px
                     node = v[i]
@@ -1950,6 +2110,7 @@ def draw_frame(screen):
                         is_top = True
                     else:
                         is_top = False
+                    is_top = True
                     if side is not None:
                         screen.blit(pg.transform.scale(side,
                                                        scaled_b_size),
@@ -2247,26 +2408,28 @@ def draw_frame(screen):
                             # border_size[0],
                             # border_size[1])
                 # )
-                # dark red cross
+                # dark blue cross
+                # horizontal
                 border_size = target_size[0] * 2, target_size[1]
                 pg.draw.rect(
                     screen,  # scalable_surf,
                     (color[0]/2, color[1]/2, color[2]/2),
                     pg.Rect(x-round(float(target_size[0])/2.0)-thin,
-                            y-round(float(target_size[1])/2.0)-thin,
+                            y-round(float(target_size[1])/2.0),
                             border_size[0],
                             border_size[1])
                 )
+                # vertical
                 border_size = target_size[0], target_size[1] * 2
                 pg.draw.rect(
                     screen,  # scalable_surf,
                     (color[0]/2, color[1]/2, color[2]/2),
-                    pg.Rect(x-round(float(target_size[0])/2.0)-thin,
+                    pg.Rect(x-round(float(target_size[0])/2.0),
                             y-round(float(target_size[1])/2.0)-thin,
                             border_size[0],
                             border_size[1])
                 )
-                # red dot
+                # blue dot
                 pg.draw.rect(
                     screen,  # scalable_surf,
                     color,
@@ -2487,11 +2650,13 @@ def _load_sprite(what, cells, order=None, gettable=True,
                  biome="default", series=None, loop=True,
                  default_animate=None):
     """
-    Load a sprite (stored as a series of pose animations in the case of
-    mgep) from a sprite sheet.
+    Load mgep sprite (stored as a dict with cell list for each pose,
+    temporarily as SpriteStripAnim for each pose) from a sprite sheet
+    into the global file_surfs dict (reload if already loaded).
 
     Keyword arguments:
-    series -- if more than one frame, you can pass pre-generated sprite loop
+    series -- if more than one frame, you can pass pre-generated sprite
+              loop
     order -- (requires len(series)>1) indices of frames specifying order
              starting at 1
     """
@@ -2507,22 +2672,22 @@ def _load_sprite(what, cells, order=None, gettable=True,
     if pose is None:
         try_as_i = 0
         try_as = str(try_as_i)
-        mfr = material.get("serials")
+        mfr = material.get("cell_lists")
         if mfr is not None:
             while try_as in mfr:
                 try_as_i += 1
                 try_as = str(try_as_i)
         else:
-            material['serials'] = {}
+            material['cell_lists'] = {}
         pose = try_as
     else:
-        if material.get("serials") is None:
-            material['serials'] = {}
-    prev_cells = material['serials'].get(pose)
+        if material.get("cell_lists") is None:
+            material['cell_lists'] = {}
+    prev_cells = material['cell_lists'].get(pose)
     if prev_cells is None:
-        material['serials'][pose] = cells
+        material['cell_lists'][pose] = cells
     else:
-        material['serials'][pose].extend(cells)
+        material['cell_lists'][pose].extend(cells)
 
     # prev_sprite = material['tmp']['sprites'].get(pose)
     w, h = tilesets[path]['tile_size']
@@ -2826,7 +2991,7 @@ def inventory_scroll(amount):
 buttons = [None, None, None, None, None, None, None, None]
 
 
-def on_interact_far(e):
+def _on_interact_far(e):
     # only fires if not on gui
     long_press = e.get('long_press')
     if long_press is None:
@@ -2999,7 +3164,7 @@ def _process_touch(screen):
             if (dist - unit['reach']) > kEpsilon:
                 e['far'] = True
                 if act_enable:
-                    on_interact_far(e)
+                    _on_interact_far(e)
             else:
                 e['far'] = False
                 if act_enable:
@@ -3013,6 +3178,8 @@ def _process_touch(screen):
                 # unit_sk = get_unit_spatial_key(player_unit_name)
                 # unit_cs = sk.split(",")
                 # unit_loc = (int(unit_cs[0]), int(unit_cs[1]))
+        else:
+            e['far'] = False
         _check_swipe(screen, e)
         e['state']['new_press'] = False
     return e
@@ -3149,6 +3316,8 @@ def _recalculate_tops():
             stack_max = len(stack)
         # for i in range(stack):
             # block = stack[i]
+    if stack_max < 3:
+        stack_max_keys = []
 
 def pop_node(key):
     global stack_max
@@ -3161,7 +3330,7 @@ def pop_node(key):
     if sk in stacks:
         stack_prev_len = len(stacks[sk])
         stack_len = stack_prev_len
-        if stack_len > 2:
+        if stack_len > 1:
             result = stacks[sk].pop()
             stack_len -= 1
             if stack_len > stack_max:

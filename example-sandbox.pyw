@@ -66,14 +66,25 @@ npc_name = 'Stella'
 place_character('male', player_name, (0, 0))
 place_character('female', npc_name, (2, 0))
 
+
 def long_jump(e):
     move_direction(player_name, e['direction'])
     unit_jump(player_name, 5)
 
-set_visual_debug(True)
+
 
 # bind('draw_ui', on_draw_ui)
 bind('swipe_direction', long_jump)
+
+
+def scroll(e):
+    inventory_scroll(e['custom']['dir'])
+
+
+add_widget((.9, 0), (.1, .5), f=scroll, f_params_dict={'dir': -1})
+add_widget((.9, .5), (.1, .5), f=scroll, f_params_dict={'dir': 1})
+
+set_visual_debug(True)
 resize_count = 0
 while not done:
     for event in pg.event.get():
