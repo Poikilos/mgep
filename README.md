@@ -181,6 +181,8 @@ that specifies and attribution license such as CC BY)
 https://github.com/poikilos/mgep/blob/master/LICENSE
 
 ## Developer Notes:
+* Create more examples?
+  - See ~/ownCloud/d.python/apprentices/
 * run tests:
 ```bash
 if [ -f "`command -v outputinspector`" ]; then
