@@ -1763,7 +1763,7 @@ def generate_maps(what, terrain_3x5_image, transition="positive"):
     cell_counts = (3, 5)
     material = materials[what]
     if material['tmp'].get('d_maps') is not None:
-        if material['tmp']['d_maps'].get(transition) is not None
+        if material['tmp']['d_maps'].get(transition) is not None:
             print("WARNING: already has t_images for " + transition
                   + " transition during get_terrain_image")
     else:
@@ -1778,10 +1778,12 @@ def generate_maps(what, terrain_3x5_image, transition="positive"):
         int(src_size[0]/cell_counts[0]),
         int(src_size[1]/cell_counts[1])
     )
+    error("WARNING: NotImplemented: d_maps")
+    '''
     for
         if
             d_maps.append(src_size.subsurface(get_rect_from_id()))
-
+    '''
     material['tmp']['d_maps'][transition] = d_maps
 
 def get_terrain_image(frame, cutout_3x5_path, crop_from=None,
