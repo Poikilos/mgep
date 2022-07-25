@@ -72,7 +72,6 @@ def long_jump(e):
     unit_jump(player_name, 5)
 
 
-
 # bind('draw_ui', on_draw_ui)
 bind('swipe_direction', long_jump)
 
